@@ -1,0 +1,502 @@
+import { 
+  users, 
+  dataSources, 
+  indicators, 
+  whitelist, 
+  auditLogs, 
+  settings,
+  type User, 
+  type InsertUser,
+  type DataSource,
+  type InsertDataSource,
+  type Indicator,
+  type InsertIndicator,
+  type WhitelistEntry,
+  type InsertWhitelistEntry,
+  type AuditLog,
+  type InsertAuditLog,
+  type Setting,
+  type InsertSetting
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, or, ilike, desc, count, sql } from "drizzle-orm";
+
+export interface IStorage {
+  // User operations
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  updateUserLastLogin(id: number): Promise<void>;
+
+  // Dashboard stats
+  getDashboardStats(): Promise<any>;
+
+  // Data source operations
+  getDataSources(): Promise<DataSource[]>;
+  getActiveDataSources(): Promise<DataSource[]>;
+  createDataSource(dataSource: InsertDataSource): Promise<DataSource>;
+  updateDataSource(id: number, data: Partial<DataSource>): Promise<DataSource>;
+  deleteDataSource(id: number): Promise<void>;
+  updateDataSourceStatus(id: number, status: string, error: string | null): Promise<void>;
+
+  // Indicator operations
+  getIndicators(page: number, limit: number, filters: any): Promise<any>;
+  createIndicator(indicator: InsertIndicator): Promise<Indicator>;
+  createOrUpdateIndicator(indicator: Partial<InsertIndicator>): Promise<Indicator>;
+  updateIndicator(id: number, data: Partial<Indicator>): Promise<Indicator>;
+  deleteIndicator(id: number): Promise<void>;
+  isWhitelisted(value: string, type: string): Promise<boolean>;
+  getActiveIndicatorsByType(type: string): Promise<{ value: string }[]>;
+
+  // Whitelist operations
+  getWhitelist(): Promise<WhitelistEntry[]>;
+  createWhitelistEntry(entry: InsertWhitelistEntry): Promise<WhitelistEntry>;
+  deleteWhitelistEntry(id: number): Promise<void>;
+
+  // Audit log operations
+  getAuditLogs(page: number, limit: number, filters: any): Promise<any>;
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+
+  // Settings operations
+  getSettings(): Promise<Setting[]>;
+  updateSettings(settingsData: Record<string, any>, userId: number): Promise<void>;
+
+  // Public file stats
+  getPublicFileStats(): Promise<any>;
+}
+
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async updateUserLastLogin(id: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ lastLogin: new Date() })
+      .where(eq(users.id, id));
+  }
+
+  async getDashboardStats(): Promise<any> {
+    const [totalIndicators] = await db.select({ count: count() }).from(indicators);
+    const [activeIndicators] = await db.select({ count: count() }).from(indicators).where(eq(indicators.isActive, true));
+    const [totalDataSources] = await db.select({ count: count() }).from(dataSources);
+    
+    const indicatorsByType = await db
+      .select({
+        type: indicators.type,
+        count: count()
+      })
+      .from(indicators)
+      .where(eq(indicators.isActive, true))
+      .groupBy(indicators.type);
+
+    const recentActivity = await db
+      .select()
+      .from(auditLogs)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(10);
+
+    const dataSourcesStatus = await db
+      .select({
+        id: dataSources.id,
+        name: dataSources.name,
+        indicatorType: dataSources.indicatorType,
+        lastFetchStatus: dataSources.lastFetchStatus,
+        lastFetch: dataSources.lastFetch,
+        fetchInterval: dataSources.fetchInterval,
+      })
+      .from(dataSources)
+      .where(eq(dataSources.isActive, true))
+      .limit(10);
+
+    const indicatorTypeMap = indicatorsByType.reduce((acc, item) => {
+      acc[item.type] = item.count;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      totalIndicators: totalIndicators.count,
+      activeIndicators: activeIndicators.count,
+      dataSources: totalDataSources.count,
+      lastUpdate: "2 min ago",
+      indicatorsByType: {
+        ip: indicatorTypeMap.ip || 0,
+        domain: indicatorTypeMap.domain || 0,
+        hash: indicatorTypeMap.hash || 0,
+        url: indicatorTypeMap.url || 0,
+      },
+      recentActivity: recentActivity.map(log => ({
+        id: log.id,
+        level: log.level,
+        action: log.action,
+        details: log.details,
+        createdAt: log.createdAt.toISOString(),
+      })),
+      dataSourcesStatus: dataSourcesStatus.map(source => ({
+        id: source.id,
+        name: source.name,
+        type: source.indicatorType,
+        status: source.lastFetchStatus || 'pending',
+        lastFetch: source.lastFetch ? new Date(source.lastFetch).toLocaleString() : 'Never',
+        nextFetch: source.lastFetch ? 
+          `In ${Math.max(0, Math.floor((source.fetchInterval - (Date.now() - new Date(source.lastFetch).getTime()) / 1000) / 60))} minutes` : 
+          'Pending',
+      })),
+    };
+  }
+
+  async getDataSources(): Promise<DataSource[]> {
+    return await db.select().from(dataSources).orderBy(desc(dataSources.createdAt));
+  }
+
+  async getActiveDataSources(): Promise<DataSource[]> {
+    return await db.select().from(dataSources).where(eq(dataSources.isActive, true));
+  }
+
+  async createDataSource(dataSource: InsertDataSource): Promise<DataSource> {
+    const [source] = await db
+      .insert(dataSources)
+      .values(dataSource)
+      .returning();
+    return source;
+  }
+
+  async updateDataSource(id: number, data: Partial<DataSource>): Promise<DataSource> {
+    const [source] = await db
+      .update(dataSources)
+      .set(data)
+      .where(eq(dataSources.id, id))
+      .returning();
+    return source;
+  }
+
+  async deleteDataSource(id: number): Promise<void> {
+    await db.delete(dataSources).where(eq(dataSources.id, id));
+  }
+
+  async updateDataSourceStatus(id: number, status: string, error: string | null): Promise<void> {
+    await db
+      .update(dataSources)
+      .set({
+        lastFetchStatus: status,
+        lastFetchError: error,
+        lastFetch: new Date(),
+      })
+      .where(eq(dataSources.id, id));
+  }
+
+  async getIndicators(page: number, limit: number, filters: any): Promise<any> {
+    const offset = (page - 1) * limit;
+    const conditions = [];
+
+    if (filters.type) {
+      conditions.push(eq(indicators.type, filters.type));
+    }
+    if (filters.status === 'active') {
+      conditions.push(eq(indicators.isActive, true));
+    } else if (filters.status === 'passive') {
+      conditions.push(eq(indicators.isActive, false));
+    }
+    if (filters.source) {
+      conditions.push(eq(indicators.source, filters.source));
+    }
+    if (filters.search) {
+      conditions.push(ilike(indicators.value, `%${filters.search}%`));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [totalCount] = await db
+      .select({ count: count() })
+      .from(indicators)
+      .where(whereClause);
+
+    const data = await db
+      .select()
+      .from(indicators)
+      .where(whereClause)
+      .orderBy(desc(indicators.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: totalCount.count,
+        start: offset + 1,
+        end: Math.min(offset + limit, totalCount.count),
+        hasNext: offset + limit < totalCount.count,
+      },
+    };
+  }
+
+  async createIndicator(indicator: InsertIndicator): Promise<Indicator> {
+    const [created] = await db
+      .insert(indicators)
+      .values(indicator)
+      .returning();
+    return created;
+  }
+
+  async createOrUpdateIndicator(indicator: Partial<InsertIndicator>): Promise<Indicator> {
+    if (!indicator.value || !indicator.type) {
+      throw new Error("Value and type are required");
+    }
+
+    const existing = await db
+      .select()
+      .from(indicators)
+      .where(and(
+        eq(indicators.value, indicator.value),
+        eq(indicators.type, indicator.type)
+      ))
+      .limit(1);
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(indicators)
+        .set({
+          updatedAt: new Date(),
+          source: indicator.source || existing[0].source,
+          sourceId: indicator.sourceId || existing[0].sourceId,
+        })
+        .where(eq(indicators.id, existing[0].id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(indicators)
+        .values({
+          value: indicator.value,
+          type: indicator.type,
+          hashType: indicator.hashType,
+          source: indicator.source || 'unknown',
+          sourceId: indicator.sourceId,
+          isActive: indicator.isActive ?? true,
+          notes: indicator.notes,
+          createdBy: indicator.createdBy,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async updateIndicator(id: number, data: Partial<Indicator>): Promise<Indicator> {
+    const [updated] = await db
+      .update(indicators)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(indicators.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteIndicator(id: number): Promise<void> {
+    await db.delete(indicators).where(eq(indicators.id, id));
+  }
+
+  async isWhitelisted(value: string, type: string): Promise<boolean> {
+    const result = await db
+      .select()
+      .from(whitelist)
+      .where(and(
+        eq(whitelist.value, value),
+        eq(whitelist.type, type)
+      ))
+      .limit(1);
+    
+    return result.length > 0;
+  }
+
+  async getActiveIndicatorsByType(type: string): Promise<{ value: string }[]> {
+    return await db
+      .select({ value: indicators.value })
+      .from(indicators)
+      .where(and(
+        eq(indicators.type, type),
+        eq(indicators.isActive, true)
+      ));
+  }
+
+  async getWhitelist(): Promise<WhitelistEntry[]> {
+    return await db
+      .select({
+        id: whitelist.id,
+        value: whitelist.value,
+        type: whitelist.type,
+        reason: whitelist.reason,
+        createdAt: whitelist.createdAt,
+        createdBy: {
+          username: users.username
+        }
+      })
+      .from(whitelist)
+      .leftJoin(users, eq(whitelist.createdBy, users.id))
+      .orderBy(desc(whitelist.createdAt));
+  }
+
+  async createWhitelistEntry(entry: InsertWhitelistEntry): Promise<WhitelistEntry> {
+    const [created] = await db
+      .insert(whitelist)
+      .values(entry)
+      .returning();
+    return created;
+  }
+
+  async deleteWhitelistEntry(id: number): Promise<void> {
+    await db.delete(whitelist).where(eq(whitelist.id, id));
+  }
+
+  async getAuditLogs(page: number, limit: number, filters: any): Promise<any> {
+    const offset = (page - 1) * limit;
+    const conditions = [];
+
+    if (filters.level) {
+      conditions.push(eq(auditLogs.level, filters.level));
+    }
+    if (filters.action) {
+      conditions.push(eq(auditLogs.action, filters.action));
+    }
+    if (filters.user) {
+      conditions.push(eq(users.username, filters.user));
+    }
+    if (filters.startDate) {
+      conditions.push(sql`${auditLogs.createdAt} >= ${new Date(filters.startDate)}`);
+    }
+    if (filters.endDate) {
+      conditions.push(sql`${auditLogs.createdAt} <= ${new Date(filters.endDate)}`);
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [totalCount] = await db
+      .select({ count: count() })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .where(whereClause);
+
+    const data = await db
+      .select({
+        id: auditLogs.id,
+        level: auditLogs.level,
+        action: auditLogs.action,
+        resource: auditLogs.resource,
+        resourceId: auditLogs.resourceId,
+        details: auditLogs.details,
+        ipAddress: auditLogs.ipAddress,
+        createdAt: auditLogs.createdAt,
+        user: users.username,
+      })
+      .from(auditLogs)
+      .leftJoin(users, eq(auditLogs.userId, users.id))
+      .where(whereClause)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: totalCount.count,
+        start: offset + 1,
+        end: Math.min(offset + limit, totalCount.count),
+        hasNext: offset + limit < totalCount.count,
+      },
+    };
+  }
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const [created] = await db
+      .insert(auditLogs)
+      .values(log)
+      .returning();
+    return created;
+  }
+
+  async getSettings(): Promise<Setting[]> {
+    return await db.select().from(settings);
+  }
+
+  async updateSettings(settingsData: Record<string, any>, userId: number): Promise<void> {
+    for (const [key, value] of Object.entries(settingsData)) {
+      const existing = await db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, key))
+        .limit(1);
+
+      const isEncrypted = key.includes('password') || key.includes('secret');
+
+      if (existing.length > 0) {
+        await db
+          .update(settings)
+          .set({
+            value: String(value),
+            encrypted: isEncrypted,
+            updatedAt: new Date(),
+            updatedBy: userId,
+          })
+          .where(eq(settings.key, key));
+      } else {
+        await db
+          .insert(settings)
+          .values({
+            key,
+            value: String(value),
+            encrypted: isEncrypted,
+            updatedBy: userId,
+          });
+      }
+    }
+  }
+
+  async getPublicFileStats(): Promise<any> {
+    const [ipCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'ip'), eq(indicators.isActive, true)));
+    const [domainCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'domain'), eq(indicators.isActive, true)));
+    const [hashCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'hash'), eq(indicators.isActive, true)));
+    const [urlCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'url'), eq(indicators.isActive, true)));
+
+    return {
+      ip: {
+        count: Math.ceil(ipCount.count / 100000),
+        totalCount: ipCount.count.toLocaleString(),
+        lastUpdate: "2 min ago",
+      },
+      domain: {
+        count: Math.ceil(domainCount.count / 100000),
+        totalCount: domainCount.count.toLocaleString(),
+        lastUpdate: "2 min ago",
+      },
+      hash: {
+        count: Math.ceil(hashCount.count / 100000),
+        totalCount: hashCount.count.toLocaleString(),
+        lastUpdate: "2 min ago",
+      },
+      url: {
+        count: Math.ceil(urlCount.count / 100000),
+        totalCount: urlCount.count.toLocaleString(),
+        lastUpdate: "2 min ago",
+      },
+    };
+  }
+}
+
+export const storage = new DatabaseStorage();

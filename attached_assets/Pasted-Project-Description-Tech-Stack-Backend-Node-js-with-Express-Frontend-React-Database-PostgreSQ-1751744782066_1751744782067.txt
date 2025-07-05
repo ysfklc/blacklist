@@ -1,0 +1,130 @@
+Project Description
+Tech Stack:
+
+Backend: Node.js with Express
+
+Frontend: React
+
+Database: PostgreSQL
+
+🎯 Project Objective
+The goal of this project is to periodically fetch data from configurable remote sources (URLs), parse them using predefined regular expressions (for IPs, domains, hashes, and URLs), and persist the extracted indicators in a PostgreSQL database. These indicators will then be published to public directories as .txt files.
+
+🔍 Data Fetching & Processing
+The admin can define data sources dynamically via a management UI.
+
+Each source entry will have:
+
+Source URL
+
+Indicator Type (IP / Domain / Hash / URL)
+
+Fetch Interval (in seconds)
+
+Active / Passive status
+
+The backend will:
+
+Fetch data from each source at defined intervals.
+
+Parse data using regex (IP, domain, hash, URL).
+
+Save indicators into the database.
+
+Maintain metadata for each record:
+
+Creation time
+
+Last update time (update timestamp if duplicate is re-fetched)
+
+Source URL
+
+Type of hash (md5, sha1, sha256, sha512)
+
+Active/passive status
+
+🔐 Authentication & Authorization
+Authentication Types:
+
+Local authentication
+
+LDAP (Active Directory) authentication
+
+Initial Admin User:
+
+Username: admin
+
+Password: test123 (stored encrypted with bcrypt)
+
+User Roles:
+
+Admin: Full access, can delete/update indicators, manage settings, view logs.
+
+User: Can toggle active/passive status and add notes (analyst role).
+
+Reporter: Read-only access to indicators.
+
+📁 Indicator Management
+Create a UI for manual addition of IPs, domains, hashes, and URLs.
+
+Display all automatically fetched indicators in a table view with:
+
+Active/passive toggle
+
+Editable notes field
+
+📝 Logging & Audit
+Every action in the system will be logged (CRUD operations, status changes, etc.)
+
+Admins can view logs via a web-based Audit Logs page.
+
+📂 Public Directory & Blacklist Generation
+Expose a public directory: /public/blacklist
+
+Export active indicators into .txt files as follows:
+
+Paths:
+
+blacklist/IP/BlackIP0.txt, BlackIP1.txt, ...
+
+blacklist/Domain/BlackDomain0.txt, ...
+
+blacklist/Hash/BlackHash0.txt, ...
+
+blacklist/URL/BlackURL0.txt, ...
+
+Each file should contain maximum 100,000 lines
+
+Domain entries should be exported as both domain.com and *.domain.com if applicable.
+
+⚙️ Settings Page (Admin Only)
+Admins will have access to a Settings page to:
+
+Configure LDAP / Active Directory connection
+
+Manage fetch intervals and source types for each data source (start/stop functionality)
+
+Update sensitive configuration values (passwords must be encrypted)
+
+✅ Whitelist Management
+A separate Whitelist page will allow input of IPs, domains, hashes that should not be blacklisted
+
+Attempted additions to the blacklist from whitelisted entries should be logged with:
+
+Source
+
+Timestamp
+
+Attempt details
+
+📊 UI Pages
+Dashboard
+
+Data Sources
+
+Settings
+
+Audit Logs
+
+Public Links
+
