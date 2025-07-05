@@ -110,8 +110,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User management routes
   app.get("/api/users", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
-      const users = await storage.getUsers();
-      res.json(users);
+      const users = await storage.getAllUsers();
+      res.json(users.map(user => ({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        authType: user.authType,
+        isActive: user.isActive,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+      })));
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }
@@ -121,8 +129,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertUserSchema.parse(req.body);
       
-      // Hash password
-      const hashedPassword = await hashPassword(validatedData.password);
+      // Hash password only for local auth users
+      let hashedPassword = null;
+      if (validatedData.authType === "local" && validatedData.password) {
+        hashedPassword = await hashPassword(validatedData.password);
+      }
       
       const user = await storage.createUser({
         ...validatedData,
@@ -210,6 +221,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ message: "User deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Routes for non-admin users to manage their own profile
+  app.get("/api/users/profile", authenticateToken, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.user.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json({
+        id: user.id,
+        username: user.username,
+        role: user.role,
+        authType: user.authType,
+        isActive: user.isActive,
+        lastLogin: user.lastLogin,
+        createdAt: user.createdAt,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.put("/api/users/profile/password", authenticateToken, async (req, res) => {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "Current password and new password are required" });
+      }
+
+      const user = await storage.getUser(req.user.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Verify current password
+      const validPassword = await bcrypt.compare(currentPassword, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Current password is incorrect" });
+      }
+
+      // Hash new password
+      const hashedPassword = await hashPassword(newPassword);
+      
+      // Update password
+      await storage.updateUserPassword(req.user.userId, hashedPassword);
+      
+      await storage.createAuditLog({
+        level: "info",
+        action: "update",
+        resource: "user",
+        resourceId: req.user.userId.toString(),
+        details: "Password updated",
+        userId: req.user.userId,
+        ipAddress: req.ip,
+      });
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // LDAP lookup route
+  app.get("/api/ldap/search", authenticateToken, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { query } = req.query;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: "Search query is required" });
+      }
+
+      // Mock LDAP search results for demonstration
+      // In a real implementation, you would connect to your LDAP server here
+      const mockResults = [
+        {
+          username: `${query}.doe`,
+          firstName: "John",
+          lastName: "Doe",
+          email: `${query}.doe@company.com`,
+          cn: `${query} Doe`,
+        },
+        {
+          username: `${query}.smith`,
+          firstName: "Jane",
+          lastName: "Smith", 
+          email: `${query}.smith@company.com`,
+          cn: `${query} Smith`,
+        }
+      ].filter(user => 
+        user.username.toLowerCase().includes(query.toLowerCase()) ||
+        user.firstName.toLowerCase().includes(query.toLowerCase()) ||
+        user.lastName.toLowerCase().includes(query.toLowerCase())
+      );
+
+      res.json(mockResults);
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }

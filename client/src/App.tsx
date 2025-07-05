@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "./hooks/use-auth";
+import { SidebarProvider, useSidebar } from "./hooks/use-sidebar";
 import ProtectedRoute from "./components/auth/protected-route";
 import Login from "./pages/login";
 import Dashboard from "./pages/dashboard";
@@ -13,13 +14,16 @@ import Whitelist from "./pages/whitelist";
 import PublicLinks from "./pages/public-links";
 import AuditLogs from "./pages/audit-logs";
 import Settings from "./pages/settings";
+import Users from "./pages/users";
 import NotFound from "@/pages/not-found";
 import Sidebar from "./components/layout/sidebar";
 import Topbar from "./components/layout/topbar";
 import { useAuth } from "./hooks/use-auth";
+import { cn } from "./lib/utils";
 
 function AppContent() {
   const { user, isLoading } = useAuth();
+  const { isCollapsed } = useSidebar();
 
   if (isLoading) {
     return (
@@ -36,7 +40,10 @@ function AppContent() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Sidebar />
-      <div className="lg:pl-64 flex flex-col min-h-screen">
+      <div className={cn(
+        "flex flex-col min-h-screen transition-all duration-300 ease-in-out",
+        isCollapsed ? "lg:pl-16" : "lg:pl-64"
+      )}>
         <Topbar />
         <Switch>
           <Route path="/" component={Dashboard} />
@@ -71,6 +78,11 @@ function AppContent() {
               <Settings />
             </ProtectedRoute>
           </Route>
+          <Route path="/users">
+            <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
+              <Users />
+            </ProtectedRoute>
+          </Route>
           <Route component={NotFound} />
         </Switch>
       </div>
@@ -82,10 +94,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <AppContent />
-        </AuthProvider>
+        <SidebarProvider>
+          <AuthProvider>
+            <Toaster />
+            <AppContent />
+          </AuthProvider>
+        </SidebarProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

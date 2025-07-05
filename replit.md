@@ -109,7 +109,12 @@ The application is designed for Replit deployment with the following characteris
 
 ```
 Changelog:
-- July 05, 2025. Initial setup
+- July 05, 2025. Initial setup and migration to Replit environment
+- July 05, 2025. Added comprehensive Users page with CRUD operations and LDAP integration
+  - Admin users: Full CRUD operations for all users
+  - Regular users: View own profile and change password
+  - LDAP integration: Search directory, auto-populate fields, no password input for LDAP users
+  - Added firstName, lastName, email fields to user schema
 ```
 
 ## User Preferences

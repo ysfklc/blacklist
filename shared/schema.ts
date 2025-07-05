@@ -6,7 +6,10 @@ import { relations } from "drizzle-orm";
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  password: text("password"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  email: text("email"),
   role: text("role").notNull().default("reporter"), // admin, user, reporter
   authType: text("auth_type").notNull().default("local"), // local, ldap
   isActive: boolean("is_active").notNull().default(true),

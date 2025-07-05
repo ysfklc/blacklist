@@ -1,13 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Save, TestTube, UserPlus, Edit, Trash2 } from "lucide-react";
+
+import { Save, TestTube } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -19,14 +18,7 @@ interface Setting {
   updatedAt: string;
 }
 
-interface SystemUser {
-  id: number;
-  username: string;
-  role: string;
-  authType: string;
-  lastLogin: string | null;
-  isActive: boolean;
-}
+
 
 export default function Settings() {
   const [ldapSettings, setLdapSettings] = useState({
@@ -50,13 +42,17 @@ export default function Settings() {
 
   const { data: settings, isLoading: settingsLoading } = useQuery<Setting[]>({
     queryKey: ["/api/settings"],
-    onSuccess: (data) => {
-      const settingsMap = data.reduce((acc, setting) => {
+  });
+
+  // Process settings data when it's available
+  useEffect(() => {
+    if (settings && settings.length > 0) {
+      const settingsMap = settings.reduce((acc, setting) => {
         acc[setting.key] = setting.value;
         return acc;
       }, {} as Record<string, string>);
 
-      // Populate LDAP settings
+      // Update LDAP settings
       setLdapSettings({
         server: settingsMap["ldap.server"] || "",
         port: parseInt(settingsMap["ldap.port"] || "389"),
@@ -66,19 +62,15 @@ export default function Settings() {
         enabled: settingsMap["ldap.enabled"] === "true",
       });
 
-      // Populate system settings
+      // Update system settings
       setSystemSettings({
         defaultFetchInterval: parseInt(settingsMap["system.defaultFetchInterval"] || "3600"),
         maxFileSize: parseInt(settingsMap["system.maxFileSize"] || "100000"),
         logRetention: parseInt(settingsMap["system.logRetention"] || "90"),
         blacklistUpdateInterval: parseInt(settingsMap["system.blacklistUpdateInterval"] || "5"),
       });
-    },
-  });
-
-  const { data: users, isLoading: usersLoading } = useQuery<SystemUser[]>({
-    queryKey: ["/api/users"],
-  });
+    }
+  }, [settings]);
 
   const saveLdapMutation = useMutation({
     mutationFn: () => apiRequest("PUT", "/api/settings", {
@@ -144,20 +136,9 @@ export default function Settings() {
     }
   };
 
-  const getRoleColor = (role: string) => {
-    switch (role) {
-      case "admin":
-        return "bg-red-100 text-red-800";
-      case "user":
-        return "bg-blue-100 text-blue-800";
-      case "reporter":
-        return "bg-gray-100 text-gray-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
 
-  if (settingsLoading || usersLoading) {
+
+  if (settingsLoading) {
     return (
       <main className="flex-1 p-6">
         <div className="max-w-4xl mx-auto">
@@ -326,71 +307,7 @@ export default function Settings() {
           </CardContent>
         </Card>
 
-        {/* User Management */}
-        <Card className="mt-6">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>User Management</CardTitle>
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add User
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Username</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Auth Type</TableHead>
-                  <TableHead>Last Login</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                      No users found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  users?.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.username}</TableCell>
-                      <TableCell>
-                        <Badge className={getRoleColor(user.role)}>
-                          {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="capitalize">{user.authType}</TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "Never"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={user.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
-                          {user.isActive ? "Active" : "Inactive"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end space-x-2">
-                          <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-900">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-900">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+
       </div>
     </main>
   );
