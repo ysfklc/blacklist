@@ -10,6 +10,7 @@ import { z } from "zod";
 import fs from "fs/promises";
 import path from "path";
 import { fetchAndParseData } from "./fetcher";
+import CIDR from "ip-cidr";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -522,6 +523,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         parseInt(limit as string),
         filters
       );
+      
+
+      
       res.json(indicators);
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
@@ -735,6 +739,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         createdBy: req.user.userId,
       });
+
+      // Validate CIDR notation for IP addresses
+      if (validatedData.type === 'ip' && validatedData.value.includes('/')) {
+        try {
+          new CIDR(validatedData.value);
+        } catch (error) {
+          return res.status(400).json({ 
+            error: "Invalid CIDR notation", 
+            details: "Please use valid CIDR format (e.g., 192.168.1.0/24)" 
+          });
+        }
+      }
       
       const entry = await storage.createWhitelistEntry(validatedData);
       

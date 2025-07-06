@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,7 @@ interface Indicator {
   source: string;
   isActive: boolean;
   notes: string | null;
+  notesCount?: number;
   createdAt: string;
   createdByUser?: string;
 }
@@ -47,10 +48,26 @@ export default function Indicators() {
     source: "all",
     search: "",
   });
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Debounced search function
+  const debouncedUpdateSearch = useCallback(() => {
+    const timeoutId = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchInput }));
+      setPage(1); // Reset to first page when searching
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [searchInput]);
+
+  // Effect to handle debounced search
+  useEffect(() => {
+    const cleanup = debouncedUpdateSearch();
+    return cleanup;
+  }, [debouncedUpdateSearch]);
 
   const { data: indicators, isLoading } = useQuery({
     queryKey: ["/api/indicators", page, filters],
@@ -174,12 +191,7 @@ export default function Indicators() {
     });
   };
 
-  const handleUpdateNotes = (indicator: Indicator, notes: string) => {
-    updateMutation.mutate({
-      id: indicator.id,
-      data: { notes },
-    });
-  };
+  // Remove the old handleUpdateNotes function as we now use the note-taking system
 
   const handleDelete = (id: number) => {
     if (confirm("Are you sure you want to delete this indicator?")) {
@@ -367,8 +379,8 @@ export default function Indicators() {
               <div>
                 <Input
                   placeholder="Search indicators..."
-                  value={filters.search}
-                  onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                 />
               </div>
             </div>
@@ -425,13 +437,27 @@ export default function Indicators() {
                         {new Date(indicator.createdAt).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <Input
-                          className="w-full border-0 p-0 text-sm focus:ring-0"
-                          placeholder="Add notes..."
-                          defaultValue={indicator.notes || ""}
-                          onBlur={(e) => handleUpdateNotes(indicator, e.target.value)}
-                          disabled={updateMutation.isPending}
-                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => handleViewDetails(indicator)}
+                        >
+                          <div className="relative inline-block">
+                            <MessageSquare className="h-3 w-3" />
+                            {(() => {
+                              const notesCount = parseInt(indicator.notesCount?.toString() || '0', 10);
+                              const legacyNotesCount = indicator.notes ? 1 : 0;
+                              const totalCount = notesCount + legacyNotesCount;
+                              return totalCount > 0 && (
+                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center min-w-3 text-[10px]">
+                                  {totalCount}
+                                </span>
+                              );
+                            })()}
+                          </div>
+                          <span className="ml-1">Notes</span>
+                        </Button>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end space-x-1">

@@ -184,7 +184,7 @@ export default function Dashboard() {
               {stats.recentActivity.length === 0 ? (
                 <p className="text-gray-500 text-sm">No recent activity</p>
               ) : (
-                <div className="flow-root">
+                <div className="flow-root max-h-96 overflow-y-auto">
                   <ul role="list" className="-mb-8">
                     {stats.recentActivity.map((activity, index) => (
                       <li key={activity.id}>
@@ -202,10 +202,10 @@ export default function Dashboard() {
                               </span>
                             </div>
                             <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                              <div>
-                                <p className="text-sm text-gray-500">{activity.details}</p>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm text-gray-500 break-words">{activity.details}</p>
                               </div>
-                              <div className="text-right text-sm whitespace-nowrap text-gray-500">
+                              <div className="text-right text-sm whitespace-nowrap text-gray-500 flex-shrink-0">
                                 <time>{new Date(activity.createdAt).toLocaleTimeString()}</time>
                               </div>
                             </div>

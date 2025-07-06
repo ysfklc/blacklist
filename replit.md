@@ -23,6 +23,15 @@ A comprehensive threat intelligence platform built with Express.js backend and R
 - **2025-01-06**: Added exponential backoff and better error handling for network timeouts
 - **2025-01-06**: Implemented multi-note system for indicators with user attribution and edit tracking
 - **2025-01-06**: Added indicator details modal with notes management functionality
+- **2025-01-06**: Fixed data source form to have no pre-selected indicator type by default
+- **2025-01-06**: Optimized database performance by removing unnecessary updated_at timestamp updates during bulk re-fetching operations
+- **2025-01-06**: Fixed Recent Activity section overflow issue with proper height constraints and scrolling
+- **2025-01-06**: Updated note-taking system to integrate legacy notes with modern note functionality
+- **2025-01-06**: Implemented debounced search in Indicators section to eliminate flickering and improve performance
+- **2025-01-06**: Added notification badges to show notes count for each indicator in the table
+- **2025-01-06**: Fixed notes count badge calculation by ensuring proper integer type conversion from database queries
+- **2025-01-06**: Repositioned notification badge to appear on top of the MessageSquare icon for better visual design
+- **2025-01-06**: Implemented CIDR subnet checking for IP whitelist entries (supports /24, /16, etc.)
 
 ## Project Architecture
 

@@ -23,6 +23,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, count, sql, inArray } from "drizzle-orm";
+import CIDR from "ip-cidr";
 
 export interface IStorage {
   // User operations
@@ -296,6 +297,11 @@ export class DatabaseStorage implements IStorage {
         updatedAt: indicators.updatedAt,
         createdBy: indicators.createdBy,
         createdByUser: users.username,
+        notesCount: sql<number>`(
+          SELECT COALESCE(COUNT(*), 0)::integer
+          FROM ${indicatorNotes}
+          WHERE ${indicatorNotes.indicatorId} = ${indicators.id}
+        )`.as('notesCount'),
       })
       .from(indicators)
       .leftJoin(users, eq(indicators.createdBy, users.id))
@@ -340,10 +346,10 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
 
     if (existing.length > 0) {
+      // Only update source info, not the updated_at timestamp for existing indicators
       const [updated] = await db
         .update(indicators)
         .set({
-          updatedAt: new Date(),
           source: indicator.source || existing[0].source,
           sourceId: indicator.sourceId || existing[0].sourceId,
         })
@@ -408,7 +414,7 @@ export class DatabaseStorage implements IStorage {
         .onConflictDoUpdate({
           target: [indicators.value, indicators.type],
           set: {
-            updatedAt: new Date(),
+            // Only update source info, not the updated_at timestamp for existing indicators
             source: sql`EXCLUDED.source`,
             sourceId: sql`EXCLUDED.source_id`,
           },
@@ -443,17 +449,8 @@ export class DatabaseStorage implements IStorage {
           await db.insert(indicators).values(newIndicators);
         }
         
-        // Update existing indicators
-        if (existing.length > 0) {
-          await db.execute(sql`
-            UPDATE indicators 
-            SET updated_at = CURRENT_TIMESTAMP
-            WHERE (value, type) IN (${sql.join(
-              existing.map(item => sql`(${item.value}, ${item.type})`),
-              sql`, `
-            )})
-          `);
-        }
+        // Skip updating existing indicators to avoid performance issues
+        // Only update updated_at when indicators are actually modified (active/inactive changes)
         
         return values.length;
       } catch (fallbackError) {
@@ -469,15 +466,36 @@ export class DatabaseStorage implements IStorage {
   async bulkCheckWhitelist(values: string[], type: string): Promise<Set<string>> {
     if (values.length === 0) return new Set();
 
-    const whitelistedItems = await db
+    // Get all whitelist entries for the type
+    const whitelistEntries = await db
       .select({ value: whitelist.value })
       .from(whitelist)
-      .where(and(
-        inArray(whitelist.value, values),
-        eq(whitelist.type, type)
-      ));
+      .where(eq(whitelist.type, type));
 
-    return new Set(whitelistedItems.map(item => item.value));
+    const whitelistValues = whitelistEntries.map(e => e.value);
+    const whitelistedSet = new Set<string>();
+
+    // For IP addresses, check both exact matches and CIDR ranges
+    if (type === 'ip') {
+      for (const value of values) {
+        if (this.isIpWhitelisted(value, whitelistValues)) {
+          whitelistedSet.add(value);
+        }
+      }
+    } else {
+      // For other types, use exact matching (original logic)
+      const exactMatches = await db
+        .select({ value: whitelist.value })
+        .from(whitelist)
+        .where(and(
+          inArray(whitelist.value, values),
+          eq(whitelist.type, type)
+        ));
+      
+      exactMatches.forEach(item => whitelistedSet.add(item.value));
+    }
+
+    return whitelistedSet;
   }
 
   async getDistinctIndicatorSources(): Promise<any[]> {
@@ -512,16 +530,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   async isWhitelisted(value: string, type: string): Promise<boolean> {
-    const result = await db
-      .select()
+    // Get all whitelist entries for the type
+    const whitelistEntries = await db
+      .select({ value: whitelist.value })
       .from(whitelist)
-      .where(and(
-        eq(whitelist.value, value),
-        eq(whitelist.type, type)
-      ))
-      .limit(1);
+      .where(eq(whitelist.type, type));
     
-    return result.length > 0;
+    // For IP addresses, check both exact matches and CIDR ranges
+    if (type === 'ip') {
+      return this.isIpWhitelisted(value, whitelistEntries.map(e => e.value));
+    }
+    
+    // For other types, use exact matching
+    return whitelistEntries.some(entry => entry.value === value);
+  }
+
+  private isIpWhitelisted(ipAddress: string, whitelistValues: string[]): boolean {
+    for (const whitelistValue of whitelistValues) {
+      // Check for exact match first
+      if (whitelistValue === ipAddress) {
+        return true;
+      }
+      
+      // Check if whitelist value is a CIDR range
+      if (whitelistValue.includes('/')) {
+        try {
+          const cidr = new CIDR(whitelistValue);
+          if (cidr.contains(ipAddress)) {
+            return true;
+          }
+        } catch (error) {
+          // Invalid CIDR format, skip this entry
+          console.warn(`Invalid CIDR format in whitelist: ${whitelistValue}`);
+          continue;
+        }
+      }
+    }
+    
+    return false;
   }
 
   async getActiveIndicatorsByType(type: string): Promise<{ value: string }[]> {

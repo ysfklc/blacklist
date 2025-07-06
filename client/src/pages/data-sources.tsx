@@ -55,7 +55,7 @@ export default function DataSources() {
     defaultValues: {
       name: "",
       url: "",
-      indicatorTypes: ["domain"],
+      indicatorTypes: [],
       fetchInterval: 3600,
     },
   });

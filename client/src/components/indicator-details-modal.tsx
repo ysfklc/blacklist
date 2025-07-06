@@ -11,6 +11,7 @@ interface Indicator {
   source: string;
   isActive: boolean;
   notes: string | null;
+  notesCount?: number;
   createdAt: string;
   createdByUser?: string;
 }
@@ -78,23 +79,8 @@ export default function IndicatorDetailsModal({
             </CardContent>
           </Card>
 
-          {/* Legacy Note (if exists) */}
-          {indicator.notes && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Legacy Note</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-700 whitespace-pre-wrap">{indicator.notes}</p>
-                <p className="text-sm text-gray-500 mt-2">
-                  This is a legacy note. New notes will be shown below with author information.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Notes Section */}
-          <IndicatorNotes indicatorId={indicator.id} />
+          <IndicatorNotes indicatorId={indicator.id} legacyNote={indicator.notes} />
         </div>
       </DialogContent>
     </Dialog>
