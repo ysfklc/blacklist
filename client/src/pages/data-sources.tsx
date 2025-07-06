@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Edit, Trash2, Pause, Play } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, Edit, Trash2, Pause, Play, Download } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,7 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 const dataSourceSchema = z.object({
   name: z.string().min(1, "Name is required"),
   url: z.string().url("Invalid URL"),
-  indicatorType: z.enum(["ip", "domain", "hash", "url"]),
+  indicatorTypes: z.array(z.enum(["ip", "domain", "hash", "url"])).min(1, "At least one indicator type is required"),
   fetchInterval: z.number().min(60, "Minimum interval is 60 seconds"),
 });
 
@@ -29,7 +30,7 @@ interface DataSource {
   id: number;
   name: string;
   url: string;
-  indicatorType: string;
+  indicatorTypes: string[];
   fetchInterval: number;
   isActive: boolean;
   lastFetch: string | null;
@@ -53,7 +54,7 @@ export default function DataSources() {
     defaultValues: {
       name: "",
       url: "",
-      indicatorType: "ip",
+      indicatorTypes: ["domain"],
       fetchInterval: 3600,
     },
   });
@@ -117,6 +118,24 @@ export default function DataSources() {
     },
   });
 
+  const fetchNowMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/data-sources/${id}/fetch`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/data-sources"] });
+      toast({
+        title: "Success",
+        description: "Fetch started - data will be processed in the background",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to start fetch",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = (data: DataSourceFormData) => {
     if (editingSource) {
       updateMutation.mutate({ id: editingSource.id, data });
@@ -130,7 +149,7 @@ export default function DataSources() {
     form.reset({
       name: source.name,
       url: source.url,
-      indicatorType: source.indicatorType as "ip" | "domain" | "hash" | "url",
+      indicatorTypes: source.indicatorTypes as ("ip" | "domain" | "hash" | "url")[],
       fetchInterval: source.fetchInterval,
     });
   };
@@ -207,23 +226,42 @@ export default function DataSources() {
                       />
                       <FormField
                         control={form.control}
-                        name="indicatorType"
-                        render={({ field }) => (
+                        name="indicatorTypes"
+                        render={() => (
                           <FormItem>
-                            <FormLabel>Indicator Type</FormLabel>
-                            <Select value={field.value} onValueChange={field.onChange}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="ip">IP Address</SelectItem>
-                                <SelectItem value="domain">Domain</SelectItem>
-                                <SelectItem value="hash">Hash</SelectItem>
-                                <SelectItem value="url">URL</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <FormLabel>Indicator Types</FormLabel>
+                            <div className="space-y-2">
+                              {(["ip", "domain", "hash", "url"] as const).map((type) => (
+                                <FormField
+                                  key={type}
+                                  control={form.control}
+                                  name="indicatorTypes"
+                                  render={({ field }) => {
+                                    return (
+                                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                        <FormControl>
+                                          <Checkbox
+                                            checked={field.value?.includes(type)}
+                                            onCheckedChange={(checked) => {
+                                              return checked
+                                                ? field.onChange([...field.value, type])
+                                                : field.onChange(
+                                                    field.value?.filter((value) => value !== type)
+                                                  )
+                                            }}
+                                          />
+                                        </FormControl>
+                                        <FormLabel className="font-normal capitalize">
+                                          {type === "ip" ? "IP Address" : 
+                                           type === "domain" ? "Domain" :
+                                           type === "hash" ? "Hash" : "URL"}
+                                        </FormLabel>
+                                      </FormItem>
+                                    )
+                                  }}
+                                />
+                              ))}
+                            </div>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -298,7 +336,7 @@ export default function DataSources() {
                       <TableCell className="text-sm text-gray-500 max-w-xs truncate">
                         {source.url}
                       </TableCell>
-                      <TableCell className="capitalize">{source.indicatorType}</TableCell>
+                      <TableCell className="capitalize">{source.indicatorTypes.join(", ")}</TableCell>
                       <TableCell>{source.fetchInterval}s</TableCell>
                       <TableCell>
                         <span
@@ -340,6 +378,15 @@ export default function DataSources() {
                       {isAdmin && (
                         <TableCell className="text-right">
                           <div className="flex justify-end space-x-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => fetchNowMutation.mutate(source.id)}
+                              disabled={fetchNowMutation.isPending}
+                              title="Pull Now"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -402,23 +449,42 @@ export default function DataSources() {
                 />
                 <FormField
                   control={form.control}
-                  name="indicatorType"
-                  render={({ field }) => (
+                  name="indicatorTypes"
+                  render={() => (
                     <FormItem>
-                      <FormLabel>Indicator Type</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="ip">IP Address</SelectItem>
-                          <SelectItem value="domain">Domain</SelectItem>
-                          <SelectItem value="hash">Hash</SelectItem>
-                          <SelectItem value="url">URL</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Indicator Types</FormLabel>
+                      <div className="space-y-2">
+                        {(["ip", "domain", "hash", "url"] as const).map((type) => (
+                          <FormField
+                            key={type}
+                            control={form.control}
+                            name="indicatorTypes"
+                            render={({ field }) => {
+                              return (
+                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                  <FormControl>
+                                    <Checkbox
+                                      checked={field.value?.includes(type)}
+                                      onCheckedChange={(checked) => {
+                                        return checked
+                                          ? field.onChange([...field.value, type])
+                                          : field.onChange(
+                                              field.value?.filter((value) => value !== type)
+                                            )
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormLabel className="font-normal capitalize">
+                                    {type === "ip" ? "IP Address" : 
+                                     type === "domain" ? "Domain" :
+                                     type === "hash" ? "Hash" : "URL"}
+                                  </FormLabel>
+                                </FormItem>
+                              )
+                            }}
+                          />
+                        ))}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}

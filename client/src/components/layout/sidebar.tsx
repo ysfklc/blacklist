@@ -37,7 +37,7 @@ export default function Sidebar() {
         <div className="flex items-center">
           <Logo size="sm" />
           {!isCollapsed && (
-            <span className="ml-3 text-white text-lg font-semibold">ThreatIntel</span>
+            <span className="ml-3 text-white text-lg font-semibold">Threat Intel</span>
           )}
         </div>
         <button
@@ -51,7 +51,6 @@ export default function Sidebar() {
           )}
         </button>
       </div>
-
       <nav className="mt-8">
         <div className="px-4 space-y-2">
           {filteredNavigation.map((item) => {
@@ -84,7 +83,6 @@ export default function Sidebar() {
           })}
         </div>
       </nav>
-
       <div className="absolute bottom-0 w-full p-4">
         <div className={cn(
           "flex items-center text-gray-300 text-sm",

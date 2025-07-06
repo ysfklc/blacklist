@@ -9,6 +9,7 @@ import { insertUserSchema, insertDataSourceSchema, insertIndicatorSchema, insert
 import { z } from "zod";
 import fs from "fs/promises";
 import path from "path";
+import { fetchAndParseData } from "./fetcher";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -411,6 +412,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ message: "Data source deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Manual fetch endpoint
+  app.post("/api/data-sources/:id/fetch", authenticateToken, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      // Get the data source
+      const dataSources = await storage.getDataSources();
+      const dataSource = dataSources.find(ds => ds.id === id);
+      
+      if (!dataSource) {
+        return res.status(404).json({ error: "Data source not found" });
+      }
+
+      if (!dataSource.isActive) {
+        return res.status(400).json({ error: "Data source is not active" });
+      }
+
+      // Log the manual fetch trigger
+      await storage.createAuditLog({
+        level: "info",
+        action: "manual_fetch",
+        resource: "data_source",
+        resourceId: id.toString(),
+        details: `Manual fetch triggered for data source: ${dataSource.name}`,
+        userId: req.user.userId,
+        ipAddress: req.ip,
+      });
+
+      // Trigger the fetch (don't await - run in background)
+      fetchAndParseData(dataSource).catch(error => {
+        console.error(`[MANUAL_FETCH] Error in background fetch for ${dataSource.name}:`, error);
+      });
+
+      res.json({ message: "Fetch started successfully" });
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }

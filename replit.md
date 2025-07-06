@@ -123,6 +123,22 @@ Changelog:
   - Added fetch overlap prevention in scheduler
   - Extended timeouts for large datasets and improved retry logic
   - Removed indicator limitation to process all 394,715 indicators without restriction
+- July 06, 2025. Successfully migrated from Replit Agent to standard Replit environment
+  - Configured PostgreSQL database with proper schema migration
+  - Implemented true background processing for large datasets
+  - Separated data fetching from processing to prevent system hangs
+  - Enhanced scheduler to trigger background tasks without blocking
+  - Fixed all deployment dependencies and environment setup
+- July 06, 2025. Implemented multiple indicator type selection for data sources
+  - Updated database schema to support indicatorTypes as array instead of single type
+  - Modified frontend with checkbox-based multi-selection interface
+  - Enhanced backend to process all selected indicator types separately
+  - Fixed database saving issue with required createdBy field
+  - Successfully tested with USOM source processing domains, IPs, and hashes simultaneously
+- July 06, 2025. Enhanced manual indicator creation process
+  - Removed Source field from manual indicator entry form (automatically set to "manual")
+  - Backend automatically sets createdBy to current user's ID for manual indicators
+  - Improved user experience by removing unnecessary manual input fields
 ```
 
 ## User Preferences

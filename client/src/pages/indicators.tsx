@@ -20,7 +20,6 @@ import { useAuth } from "@/hooks/use-auth";
 const indicatorSchema = z.object({
   value: z.string().min(1, "Value is required"),
   type: z.enum(["ip", "domain", "hash", "url"]),
-  source: z.string().min(1, "Source is required"),
   notes: z.string().optional(),
 });
 
@@ -71,13 +70,16 @@ export default function Indicators() {
     defaultValues: {
       value: "",
       type: "ip",
-      source: "manual",
       notes: "",
     },
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: IndicatorFormData) => apiRequest("POST", "/api/indicators", data),
+    mutationFn: (data: IndicatorFormData) => 
+      apiRequest("POST", "/api/indicators", {
+        ...data,
+        source: "manual"
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/indicators"] });
       setIsAddModalOpen(false);
@@ -247,19 +249,7 @@ export default function Indicators() {
                           </FormItem>
                         )}
                       />
-                      <FormField
-                        control={form.control}
-                        name="source"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Source</FormLabel>
-                            <FormControl>
-                              <Input placeholder="manual" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+
                       <FormField
                         control={form.control}
                         name="notes"

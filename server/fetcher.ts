@@ -13,18 +13,28 @@ const DOMAIN_REGEX = /(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-
 const HASH_REGEX = /\b[a-fA-F0-9]{32,128}\b/g;
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
 
+// Track active fetches to prevent overlap
+const activeFetches = new Set<number>();
+
 export async function fetchAndParseData(source: DataSource): Promise<void> {
+  // Check if fetch is already in progress for this source
+  if (activeFetches.has(source.id)) {
+    console.log(`[FETCH] Skipping ${source.name} - fetch already in progress`);
+    return;
+  }
+
+  activeFetches.add(source.id);
   let timeoutId: NodeJS.Timeout | undefined;
   
   try {
     console.log(`[FETCH] Starting fetch for ${source.name} from ${source.url}`);
     
-    // Create an AbortController for timeout - extended for large datasets
+    // Create an AbortController for timeout
     const controller = new AbortController();
     timeoutId = setTimeout(() => {
       console.log(`[FETCH] Aborting fetch for ${source.name} due to timeout`);
       controller.abort();
-    }, 60000); // Increased to 60 seconds for large datasets
+    }, 120000); // 2 minutes for large datasets
     
     const response = await fetch(source.url, {
       headers: {
@@ -44,112 +54,49 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
     }
 
     const data = await response.text();
-    console.log(`Fetched ${data.length} characters from ${source.name}`);
+    console.log(`[FETCH] Fetched ${data.length} characters from ${source.name}`);
     
+    // Parse data immediately
     const parsed = parseData(data);
-    console.log(`Parsed indicators: IPs=${parsed.ips.length}, Domains=${parsed.domains.length}, Hashes=${parsed.hashes.length}, URLs=${parsed.urls.length}`);
+    console.log(`[FETCH] Parsed indicators: IPs=${parsed.ips.length}, Domains=${parsed.domains.length}, Hashes=${parsed.hashes.length}, URLs=${parsed.urls.length}`);
     
-    let indicators: string[] = [];
-    let hashType: string | undefined;
-
-    switch (source.indicatorType) {
-      case "ip":
-        indicators = parsed.ips;
-        break;
-      case "domain":
-        indicators = parsed.domains;
-        break;
-      case "hash":
-        indicators = parsed.hashes;
-        hashType = detectHashType(indicators[0]);
-        break;
-      case "url":
-        indicators = parsed.urls;
-        break;
-    }
+    // Update source status to indicate fetch is complete, processing started
+    await storage.updateDataSourceStatus(source.id, "processing", null);
     
-    console.log(`Selected ${indicators.length} indicators for type: ${source.indicatorType}`);
-    console.log(`[FETCH] Processing all ${indicators.length} indicators without limitation`);
+    // Process indicators for each selected type
+    const processingPromises: Promise<void>[] = [];
+    
+    for (const indicatorType of source.indicatorTypes) {
+      let indicators: string[] = [];
+      let hashType: string | undefined;
 
-    // Filter out whitelisted indicators
-    const validIndicators = [];
-    for (const indicator of indicators) {
-      const isWhitelisted = await storage.isWhitelisted(indicator, source.indicatorType);
-      if (!isWhitelisted) {
-        validIndicators.push(indicator);
-      } else {
-        // Log whitelist block
-        await storage.createAuditLog({
-          level: "warning",
-          action: "blocked",
-          resource: "indicator",
-          details: `Whitelist blocked indicator: ${indicator} from ${source.name}`,
-          metadata: {
-            sourceId: source.id,
-            sourceUrl: source.url,
-          },
-        });
+      switch (indicatorType) {
+        case "ip":
+          indicators = parsed.ips;
+          break;
+        case "domain":
+          indicators = parsed.domains;
+          break;
+        case "hash":
+          indicators = parsed.hashes;
+          hashType = indicators.length > 0 ? detectHashType(indicators[0]) : undefined;
+          break;
+        case "url":
+          indicators = parsed.urls;
+          break;
       }
-    }
-
-    // Save indicators to database in batches
-    console.log(`[FETCH] Saving ${validIndicators.length} indicators to database in batches`);
-    
-    const BATCH_SIZE = 50; // Reduced batch size for better stability
-    let savedCount = 0;
-    
-    for (let i = 0; i < validIndicators.length; i += BATCH_SIZE) {
-      const batch = validIndicators.slice(i, i + BATCH_SIZE);
       
-      try {
-        // Process batch with Promise.allSettled for better error handling
-        const results = await Promise.allSettled(
-          batch.map(indicator => 
-            storage.createOrUpdateIndicator({
-              value: indicator,
-              type: source.indicatorType,
-              hashType,
-              source: source.name,
-              sourceId: source.id,
-              isActive: true,
-            })
-          )
+      if (indicators.length > 0) {
+        console.log(`[FETCH] Selected ${indicators.length} indicators for type: ${indicatorType}`);
+        
+        // Process indicators in background for this type (don't await)
+        processingPromises.push(
+          processIndicatorsInBackground(source, indicators, hashType, indicatorType)
         );
-        
-        const successful = results.filter(r => r.status === 'fulfilled').length;
-        savedCount += successful;
-        
-        if (savedCount % 1000 === 0 || i + BATCH_SIZE >= validIndicators.length) {
-          console.log(`[FETCH] Saved ${savedCount}/${validIndicators.length} indicators (batch ${Math.floor(i/BATCH_SIZE) + 1})`);
-        }
-        
-        // Small delay between batches to prevent overwhelming the database
-        if (i + BATCH_SIZE < validIndicators.length) {
-          await new Promise(resolve => setTimeout(resolve, 10));
-        }
-        
-      } catch (error) {
-        console.error(`[FETCH] Error saving batch starting at ${i}:`, error);
+      } else {
+        console.log(`[FETCH] No indicators found for type: ${indicatorType}`);
       }
     }
-    
-    console.log(`[FETCH] Completed saving ${savedCount} indicators`);
-
-    // Update source status
-    await storage.updateDataSourceStatus(source.id, "success", null);
-
-    await storage.createAuditLog({
-      level: "info",
-      action: "fetch",
-      resource: "data_source",
-      resourceId: source.id.toString(),
-      details: `Successfully fetched ${validIndicators.length} indicators from ${source.name}`,
-      metadata: {
-        totalFetched: indicators.length,
-        validIndicators: validIndicators.length,
-        whitelistBlocked: indicators.length - validIndicators.length,
-      },
-    });
 
   } catch (error) {
     if (timeoutId) {
@@ -161,7 +108,7 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
     let errorMessage = "Unknown error";
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        errorMessage = "Request timeout after 30 seconds";
+        errorMessage = "Request timeout after 2 minutes";
       } else if (error.message.includes('ECONNRESET')) {
         errorMessage = "Connection reset by remote server";
       } else if (error.message.includes('ENOTFOUND')) {
@@ -185,6 +132,127 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
       details: `Failed to fetch from ${source.name}: ${errorMessage}`,
       metadata: {
         error: errorMessage,
+        url: source.url,
+      },
+    });
+  } finally {
+    activeFetches.delete(source.id);
+  }
+}
+
+async function processIndicatorsInBackground(source: DataSource, indicators: string[], hashType?: string, indicatorType?: string): Promise<void> {
+  try {
+    console.log(`[PROCESS] Starting background processing of ${indicators.length} indicators for ${source.name}`);
+    
+    // Filter out whitelisted indicators in batches
+    const validIndicators = [];
+    const FILTER_BATCH_SIZE = 1000;
+    let whitelistBlocked = 0;
+    
+    for (let i = 0; i < indicators.length; i += FILTER_BATCH_SIZE) {
+      const batch = indicators.slice(i, i + FILTER_BATCH_SIZE);
+      
+      for (const indicator of batch) {
+        const isWhitelisted = await storage.isWhitelisted(indicator, indicatorType || 'unknown');
+        if (!isWhitelisted) {
+          validIndicators.push(indicator);
+        } else {
+          whitelistBlocked++;
+        }
+      }
+      
+      // Progress update every 10k indicators
+      if ((i + FILTER_BATCH_SIZE) % 10000 === 0 || i + FILTER_BATCH_SIZE >= indicators.length) {
+        console.log(`[PROCESS] Filtered ${i + FILTER_BATCH_SIZE}/${indicators.length} indicators (${validIndicators.length} valid, ${whitelistBlocked} blocked)`);
+      }
+    }
+
+    console.log(`[PROCESS] Saving ${validIndicators.length} valid indicators to database`);
+    
+    // Save indicators to database in batches
+    const SAVE_BATCH_SIZE = 50; // Reduced batch size for better stability
+    let savedCount = 0;
+    
+    for (let i = 0; i < validIndicators.length; i += SAVE_BATCH_SIZE) {
+      const batch = validIndicators.slice(i, i + SAVE_BATCH_SIZE);
+      console.log(`[PROCESS] Processing batch ${Math.floor(i/SAVE_BATCH_SIZE) + 1}/${Math.ceil(validIndicators.length/SAVE_BATCH_SIZE)}: indicators ${i+1}-${Math.min(i+SAVE_BATCH_SIZE, validIndicators.length)}`);
+      
+      try {
+        // Process batch with Promise.allSettled for better error handling
+        const results = await Promise.allSettled(
+          batch.map(indicator => 
+            storage.createOrUpdateIndicator({
+              value: indicator,
+              type: indicatorType || 'unknown',
+              hashType,
+              source: source.name,
+              sourceId: source.id,
+              isActive: true,
+              createdBy: 1, // Default to admin user for system fetches
+            })
+          )
+        );
+        
+        const successful = results.filter(r => r.status === 'fulfilled').length;
+        const failed = results.filter(r => r.status === 'rejected');
+        
+        if (failed.length > 0) {
+          console.log(`[PROCESS] Batch had ${failed.length} failures:`);
+          failed.slice(0, 3).forEach((failure, index) => {
+            console.log(`[PROCESS] Error ${index + 1}:`, failure.reason);
+          });
+        }
+        
+        savedCount += successful;
+        
+        // Progress update every 1k saved
+        if (savedCount % 1000 === 0 || i + SAVE_BATCH_SIZE >= validIndicators.length) {
+          console.log(`[PROCESS] Saved ${savedCount}/${validIndicators.length} indicators (batch ${Math.floor(i/SAVE_BATCH_SIZE) + 1})`);
+        }
+        
+        // Small delay between batches to prevent overwhelming the database
+        if (i + SAVE_BATCH_SIZE < validIndicators.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
+      } catch (error) {
+        console.error(`[PROCESS] Error saving batch starting at ${i}:`, error);
+      }
+    }
+    
+    console.log(`[PROCESS] Completed processing ${source.name}: ${savedCount} indicators saved`);
+
+    // Update source status to success
+    await storage.updateDataSourceStatus(source.id, "success", null);
+
+    await storage.createAuditLog({
+      level: "info",
+      action: "fetch",
+      resource: "data_source",
+      resourceId: source.id.toString(),
+      details: `Successfully processed ${savedCount} indicators from ${source.name}`,
+      metadata: {
+        totalFetched: indicators.length,
+        validIndicators: validIndicators.length,
+        whitelistBlocked: whitelistBlocked,
+        savedIndicators: savedCount,
+      },
+    });
+
+  } catch (error) {
+    console.error(`[PROCESS] Error processing indicators for ${source.name}:`, error);
+    
+    // Update source status to error
+    await storage.updateDataSourceStatus(source.id, "error", `Processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+    await storage.createAuditLog({
+      level: "error",
+      action: "process",
+      resource: "data_source",
+      resourceId: source.id.toString(),
+      details: `Failed to process indicators from ${source.name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      metadata: {
+        error: error instanceof Error ? error.message : 'Unknown error',
         url: source.url,
       },
     });

@@ -21,7 +21,7 @@ export const dataSources = pgTable("data_sources", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   url: text("url").notNull(),
-  indicatorType: text("indicator_type").notNull(), // ip, domain, hash, url
+  indicatorTypes: text("indicator_types").array().notNull(), // array of: ip, domain, hash, url
   fetchInterval: integer("fetch_interval").notNull().default(3600), // seconds
   isActive: boolean("is_active").notNull().default(true),
   lastFetch: timestamp("last_fetch"),
