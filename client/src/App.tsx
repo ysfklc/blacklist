@@ -12,6 +12,7 @@ import DataSources from "./pages/data-sources";
 import Indicators from "./pages/indicators";
 import Whitelist from "./pages/whitelist";
 import PublicLinks from "./pages/public-links";
+import PublicBlacklist from "./pages/public-blacklist";
 import AuditLogs from "./pages/audit-logs";
 import Settings from "./pages/settings";
 import Users from "./pages/users";
@@ -37,60 +38,68 @@ function AppContent() {
     );
   }
 
-  if (!user) {
-    return <Login />;
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Sidebar />
-      <div className={cn(
-        "flex flex-col min-h-screen transition-all duration-300 ease-in-out",
-        isCollapsed ? "lg:pl-16" : "lg:pl-64"
-      )}>
-        <Topbar />
-        <Switch>
-          <Route path="/" component={Dashboard} />
-          <Route path="/dashboard" component={Dashboard} />
-          <Route path="/data-sources">
-            <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
-              <DataSources />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/indicators">
-            <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
-              <Indicators />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/whitelist">
-            <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
-              <Whitelist />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/public-links">
-            <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
-              <PublicLinks />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/audit-logs">
-            <ProtectedRoute allowedRoles={["admin", "user"]}>
-              <AuditLogs />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/settings">
-            <ProtectedRoute allowedRoles={["admin"]}>
-              <Settings />
-            </ProtectedRoute>
-          </Route>
-          <Route path="/users">
-            <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
-              <Users />
-            </ProtectedRoute>
-          </Route>
-          <Route component={NotFound} />
-        </Switch>
-      </div>
-    </div>
+    <Switch>
+      {/* Public routes - no authentication required */}
+      <Route path="/public/blacklist" component={PublicBlacklist} />
+      
+      {/* Protected routes - authentication required */}
+      <Route>
+        {!user ? (
+          <Login />
+        ) : (
+          <div className="min-h-screen bg-gray-50">
+            <Sidebar />
+            <div className={cn(
+              "flex flex-col min-h-screen transition-all duration-300 ease-in-out",
+              isCollapsed ? "lg:pl-16" : "lg:pl-64"
+            )}>
+              <Topbar />
+              <Switch>
+                <Route path="/" component={Dashboard} />
+                <Route path="/dashboard" component={Dashboard} />
+                <Route path="/data-sources">
+                  <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
+                    <DataSources />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/indicators">
+                  <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
+                    <Indicators />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/whitelist">
+                  <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
+                    <Whitelist />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/public-links">
+                  <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
+                    <PublicLinks />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/audit-logs">
+                  <ProtectedRoute allowedRoles={["admin", "user"]}>
+                    <AuditLogs />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/settings">
+                  <ProtectedRoute allowedRoles={["admin"]}>
+                    <Settings />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/users">
+                  <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
+                    <Users />
+                  </ProtectedRoute>
+                </Route>
+                <Route component={NotFound} />
+              </Switch>
+            </div>
+          </div>
+        )}
+      </Route>
+    </Switch>
   );
 }
 

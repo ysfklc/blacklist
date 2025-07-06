@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Logo } from "@/components/ui/logo";
 import { useToast } from "@/hooks/use-toast";
+import { ExternalLink } from "lucide-react";
 
 export default function Login() {
   const [username, setUsername] = useState("");
@@ -98,6 +100,23 @@ export default function Login() {
             </form>
           </CardContent>
         </Card>
+
+        {/* Public Access Section */}
+        <div className="mt-6 text-center">
+          <div className="bg-gray-800 bg-opacity-50 rounded-lg p-4 border border-gray-600">
+            <p className="text-gray-300 text-sm mb-3">🔗 View Public Blacklist Data</p>
+            <Link href="/public/blacklist">
+              <Button 
+                variant="outline" 
+                className="bg-transparent border-gray-400 text-gray-300 hover:bg-gray-700 hover:text-white hover:border-gray-300"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Go to Public Blacklist
+              </Button>
+            </Link>
+            <p className="text-gray-400 text-xs mt-2">Access threat intelligence data without login</p>
+          </div>
+        </div>
       </div>
     </div>
   );

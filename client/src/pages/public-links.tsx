@@ -27,12 +27,23 @@ interface PublicFileStats {
   };
 }
 
+interface BlacklistFiles {
+  IP: string[];
+  Domain: string[];
+  Hash: string[];
+  URL: string[];
+}
+
 export default function PublicLinks() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: stats, isLoading } = useQuery<PublicFileStats>({
     queryKey: ["/api/public-links/stats"],
+  });
+
+  const { data: files, isLoading: filesLoading } = useQuery<BlacklistFiles>({
+    queryKey: ["/api/public-links/files"],
   });
 
   const refreshMutation = useMutation({
@@ -49,6 +60,7 @@ export default function PublicLinks() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/public-links/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/public-links/files"] });
       toast({
         title: "Success",
         description: "Blacklist files are being refreshed",
@@ -133,15 +145,22 @@ export default function PublicLinks() {
                   <p>Last updated: <span>{stats?.ip.lastUpdate || 'Never'}</span></p>
                   <p>Total IPs: <span>{stats?.ip.totalCount || '0'}</span></p>
                 </div>
-                <div className="mt-3">
-                  <a 
-                    href="/public/blacklist/IP/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                  >
-                    Browse Files <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
+                <div className="mt-3 space-y-1">
+                  {files?.IP && files.IP.length > 0 ? (
+                    files.IP.map((file, index) => (
+                      <div key={file}>
+                        <a 
+                          href={`/public/blacklist/IP/${file}`}
+                          download
+                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
+                        >
+                          {file} <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No files available</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -168,15 +187,22 @@ export default function PublicLinks() {
                   <p>Last updated: <span>{stats?.domain.lastUpdate || 'Never'}</span></p>
                   <p>Total domains: <span>{stats?.domain.totalCount || '0'}</span></p>
                 </div>
-                <div className="mt-3">
-                  <a 
-                    href="/public/blacklist/Domain/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                  >
-                    Browse Files <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
+                <div className="mt-3 space-y-1">
+                  {files?.Domain && files.Domain.length > 0 ? (
+                    files.Domain.map((file, index) => (
+                      <div key={file}>
+                        <a 
+                          href={`/public/blacklist/Domain/${file}`}
+                          download
+                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
+                        >
+                          {file} <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No files available</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -203,15 +229,22 @@ export default function PublicLinks() {
                   <p>Last updated: <span>{stats?.hash.lastUpdate || 'Never'}</span></p>
                   <p>Total hashes: <span>{stats?.hash.totalCount || '0'}</span></p>
                 </div>
-                <div className="mt-3">
-                  <a 
-                    href="/public/blacklist/Hash/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                  >
-                    Browse Files <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
+                <div className="mt-3 space-y-1">
+                  {files?.Hash && files.Hash.length > 0 ? (
+                    files.Hash.map((file, index) => (
+                      <div key={file}>
+                        <a 
+                          href={`/public/blacklist/Hash/${file}`}
+                          download
+                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
+                        >
+                          {file} <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No files available</p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -238,15 +271,22 @@ export default function PublicLinks() {
                   <p>Last updated: <span>{stats?.url.lastUpdate || 'Never'}</span></p>
                   <p>Total URLs: <span>{stats?.url.totalCount || '0'}</span></p>
                 </div>
-                <div className="mt-3">
-                  <a 
-                    href="/public/blacklist/URL/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                  >
-                    Browse Files <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
+                <div className="mt-3 space-y-1">
+                  {files?.URL && files.URL.length > 0 ? (
+                    files.URL.map((file, index) => (
+                      <div key={file}>
+                        <a 
+                          href={`/public/blacklist/URL/${file}`}
+                          download
+                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
+                        >
+                          {file} <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No files available</p>
+                  )}
                 </div>
               </div>
             </CardContent>

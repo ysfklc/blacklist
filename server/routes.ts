@@ -927,10 +927,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Public blacklist files
   app.use("/public/blacklist", express.static(path.join(process.cwd(), "public/blacklist")));
 
+  // Protected public-links endpoints for authenticated users
   app.get("/api/public-links/stats", authenticateToken, async (req, res) => {
     try {
       const stats = await storage.getPublicFileStats();
       res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/public-links/files", authenticateToken, async (req, res) => {
+    try {
+      const blacklistPath = path.join(process.cwd(), "public/blacklist");
+      const types = ["IP", "Domain", "Hash", "URL"];
+      const files: Record<string, string[]> = {};
+
+      for (const type of types) {
+        const typePath = path.join(blacklistPath, type);
+        try {
+          const typeFiles = await fs.readdir(typePath);
+          files[type] = typeFiles.filter(file => file.endsWith('.txt'));
+        } catch (error) {
+          files[type] = [];
+        }
+      }
+
+      res.json(files);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Public API endpoints for unauthenticated access
+  app.get("/api/public/blacklist/stats", async (req, res) => {
+    try {
+      const stats = await storage.getPublicFileStats();
+      res.json(stats);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/public/blacklist/files", async (req, res) => {
+    try {
+      const blacklistPath = path.join(process.cwd(), "public/blacklist");
+      const types = ["IP", "Domain", "Hash", "URL"];
+      const files: Record<string, string[]> = {};
+
+      for (const type of types) {
+        const typePath = path.join(blacklistPath, type);
+        try {
+          const typeFiles = await fs.readdir(typePath);
+          files[type] = typeFiles.filter(file => file.endsWith('.txt'));
+        } catch (error) {
+          files[type] = [];
+        }
+      }
+
+      res.json(files);
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }

@@ -4,10 +4,14 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
-- **2025-01-06**: Successfully migrated from Replit Agent to Replit environment
-- **2025-01-06**: Fixed database schema compatibility issue with dashboard stats API  
-- **2025-01-06**: Set up PostgreSQL database with complete schema migration
-- **2025-01-06**: Configured authentication system with admin user (username: admin, password: test123)
+- **2025-07-06**: Successfully migrated from Replit Agent to Replit environment
+- **2025-07-06**: Fixed database schema compatibility issue with dashboard stats API  
+- **2025-07-06**: Set up PostgreSQL database with complete schema migration
+- **2025-07-06**: Configured authentication system with admin user (username: admin, password: test123)
+- **2025-07-06**: Added public blacklist file download functionality with clickable links for IP, Domain, Hash, and URL files
+- **2025-07-06**: Implemented API endpoint `/api/public-links/files` to list available blacklist files by type
+- **2025-07-06**: Enhanced Public Links page with individual file download links instead of directory browsing
+- **2025-07-06**: Updated dashboard icon to custom user-provided image with proper white theming for sidebar
 - **2025-01-06**: Optimized data processing performance with bulk database operations and whitelist checking
 - **2025-01-06**: Increased batch sizes from 50-1000 to 1000-5000 for much faster threat intelligence processing
 - **2025-01-06**: Added pause/resume controls for data sources to temporarily stop/start automatic fetching

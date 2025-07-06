@@ -1,12 +1,13 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { BarChart3, Database, List, CheckCircle, Link2, FileText, Settings, User, LogOut, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { Database, List, CheckCircle, Link2, FileText, Settings, User, LogOut, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
+import { DashboardIcon } from "@/components/ui/dashboard-icon";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: BarChart3, roles: ["admin", "user", "reporter"] },
+  { name: "Dashboard", href: "/dashboard", icon: DashboardIcon, roles: ["admin", "user", "reporter"] },
   { name: "Data Sources", href: "/data-sources", icon: Database, roles: ["admin", "user", "reporter"] },
   { name: "Indicators", href: "/indicators", icon: List, roles: ["admin", "user", "reporter"] },
   { name: "Whitelist", href: "/whitelist", icon: CheckCircle, roles: ["admin", "user", "reporter"] },
