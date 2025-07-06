@@ -754,17 +754,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const entry = await storage.createWhitelistEntry(validatedData);
       
+      // Deactivate any existing indicators that match this whitelist entry
+      const deactivatedCount = await storage.deactivateIndicatorsFromWhitelist(entry.value, entry.type);
+      
       await storage.createAuditLog({
         level: "info",
         action: "create",
         resource: "whitelist",
         resourceId: entry.id.toString(),
-        details: `Added to whitelist: ${entry.value}`,
+        details: `Added to whitelist: ${entry.value}${deactivatedCount > 0 ? ` (deactivated ${deactivatedCount} matching indicator${deactivatedCount > 1 ? 's' : ''})` : ''}`,
         userId: req.user.userId,
         ipAddress: req.ip,
       });
 
-      res.status(201).json(entry);
+      res.status(201).json({ ...entry, deactivatedIndicators: deactivatedCount });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid data", details: error.errors });
@@ -789,6 +792,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       res.json({ message: "Whitelist entry deleted" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Whitelist blocks routes
+  app.get("/api/whitelist/blocks", authenticateToken, async (req, res) => {
+    try {
+      const { page = 1, limit = 25 } = req.query;
+      const blocks = await storage.getWhitelistBlocks(
+        parseInt(page as string),
+        parseInt(limit as string)
+      );
+      res.json(blocks);
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }

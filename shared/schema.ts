@@ -95,6 +95,17 @@ export const indicatorNotes = pgTable("indicator_notes", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const whitelistBlocks = pgTable("whitelist_blocks", {
+  id: serial("id").primaryKey(),
+  value: text("value").notNull(),
+  type: text("type").notNull(), // ip, domain, hash, url
+  source: text("source").notNull(),
+  sourceId: integer("source_id").references(() => dataSources.id),
+  whitelistEntryId: integer("whitelist_entry_id").references(() => whitelist.id),
+  attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
+  blockedReason: text("blocked_reason"),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   dataSources: many(dataSources),
@@ -136,10 +147,22 @@ export const indicatorNotesRelations = relations(indicatorNotes, ({ one }) => ({
   }),
 }));
 
-export const whitelistRelations = relations(whitelist, ({ one }) => ({
+export const whitelistRelations = relations(whitelist, ({ one, many }) => ({
   createdBy: one(users, {
     fields: [whitelist.createdBy],
     references: [users.id],
+  }),
+  blocks: many(whitelistBlocks),
+}));
+
+export const whitelistBlocksRelations = relations(whitelistBlocks, ({ one }) => ({
+  source: one(dataSources, {
+    fields: [whitelistBlocks.sourceId],
+    references: [dataSources.id],
+  }),
+  whitelistEntry: one(whitelist, {
+    fields: [whitelistBlocks.whitelistEntryId],
+    references: [whitelist.id],
   }),
 }));
 
@@ -205,6 +228,11 @@ export const insertIndicatorNoteSchema = createInsertSchema(indicatorNotes).omit
   editedAt: true,
 });
 
+export const insertWhitelistBlockSchema = createInsertSchema(whitelistBlocks).omit({
+  id: true,
+  attemptedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -222,3 +250,5 @@ export type Session = typeof sessions.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type IndicatorNote = typeof indicatorNotes.$inferSelect;
 export type InsertIndicatorNote = z.infer<typeof insertIndicatorNoteSchema>;
+export type WhitelistBlock = typeof whitelistBlocks.$inferSelect;
+export type InsertWhitelistBlock = z.infer<typeof insertWhitelistBlockSchema>;

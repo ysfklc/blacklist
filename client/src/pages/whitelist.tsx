@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -35,13 +36,30 @@ interface WhitelistEntry {
   };
 }
 
+interface WhitelistBlock {
+  id: number;
+  value: string;
+  type: string;
+  source: string;
+  sourceName: string | null;
+  attemptedAt: string;
+  blockedReason: string | null;
+  whitelistValue: string | null;
+}
+
 export default function Whitelist() {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [selectedEntries, setSelectedEntries] = useState<number[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
 
   const { data: whitelist, isLoading } = useQuery<WhitelistEntry[]>({
     queryKey: ["/api/whitelist"],
+  });
+
+  const { data: whitelistBlocks, isLoading: blocksLoading } = useQuery({
+    queryKey: ["/api/whitelist/blocks"],
   });
 
   const form = useForm<WhitelistFormData>({
@@ -99,6 +117,43 @@ export default function Whitelist() {
       deleteMutation.mutate(id);
     }
   };
+
+  // Multi-select functionality
+  const handleSelectEntry = (entryId: number) => {
+    setSelectedEntries(prev => 
+      prev.includes(entryId) 
+        ? prev.filter(id => id !== entryId)
+        : [...prev, entryId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedEntries([]);
+      setSelectAll(false);
+    } else {
+      setSelectedEntries(whitelist?.map(entry => entry.id) || []);
+      setSelectAll(true);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedEntries.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to remove ${selectedEntries.length} selected entries from the whitelist?`;
+    if (confirm(confirmMessage)) {
+      // Delete entries one by one
+      selectedEntries.forEach(id => deleteMutation.mutate(id));
+      setSelectedEntries([]);
+      setSelectAll(false);
+    }
+  };
+
+  // Reset selection when data changes
+  useEffect(() => {
+    setSelectedEntries([]);
+    setSelectAll(false);
+  }, [whitelist]);
 
   const canAdd = user?.role === "admin" || user?.role === "user";
   const canDelete = user?.role === "admin";
@@ -219,12 +274,44 @@ export default function Whitelist() {
           </Card>
         )}
 
+        {/* Bulk Operations Toolbar */}
+        {selectedEntries.length > 0 && canDelete && (
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-blue-900">
+                  {selectedEntries.length} entries selected
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Selected
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Whitelist Table */}
         <Card className="mt-6">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
+                  {canDelete && (
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectAll}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
+                  )}
                   <TableHead>Value</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Reason</TableHead>
@@ -236,13 +323,21 @@ export default function Whitelist() {
               <TableBody>
                 {whitelist?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canDelete ? 6 : 5} className="text-center text-gray-500 py-8">
+                    <TableCell colSpan={canDelete ? 7 : 5} className="text-center text-gray-500 py-8">
                       No whitelist entries found
                     </TableCell>
                   </TableRow>
                 ) : (
                   whitelist?.map((entry) => (
                     <TableRow key={entry.id}>
+                      {canDelete && (
+                        <TableCell>
+                          <Checkbox
+                            checked={selectedEntries.includes(entry.id)}
+                            onCheckedChange={() => handleSelectEntry(entry.id)}
+                          />
+                        </TableCell>
+                      )}
                       <TableCell className="font-mono text-sm">{entry.value}</TableCell>
                       <TableCell>
                         <Badge className={getTypeColor(entry.type)}>
@@ -282,11 +377,53 @@ export default function Whitelist() {
         <Card className="mt-8">
           <CardHeader>
             <CardTitle>Recent Whitelist Blocks</CardTitle>
+            <p className="text-sm text-gray-600">Indicators from feeds that were blocked by whitelist entries</p>
           </CardHeader>
-          <CardContent>
-            <div className="text-center text-gray-500 py-8">
-              <p>Blocked attempts will be displayed here when indicators from feeds are blocked by the whitelist.</p>
-            </div>
+          <CardContent className="p-0">
+            {blocksLoading ? (
+              <div className="text-center text-gray-500 py-8">
+                Loading blocked attempts...
+              </div>
+            ) : !whitelistBlocks?.data || whitelistBlocks.data.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                <p>No blocked attempts yet. When indicators from data sources match whitelist entries, they will appear here.</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Blocked Value</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Blocked By</TableHead>
+                    <TableHead>Attempted</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {whitelistBlocks.data.map((block: WhitelistBlock) => (
+                    <TableRow key={block.id}>
+                      <TableCell className="font-mono text-sm">{block.value}</TableCell>
+                      <TableCell>
+                        <Badge className={getTypeColor(block.type)}>
+                          {block.type.toUpperCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {block.sourceName || block.source}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {block.whitelistValue || 'Unknown'}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-500">
+                        {new Date(block.attemptedAt).toLocaleDateString()} {new Date(block.attemptedAt).toLocaleTimeString()}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
           </CardContent>
         </Card>
       </div>

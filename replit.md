@@ -32,6 +32,13 @@ A comprehensive threat intelligence platform built with Express.js backend and R
 - **2025-01-06**: Fixed notes count badge calculation by ensuring proper integer type conversion from database queries
 - **2025-01-06**: Repositioned notification badge to appear on top of the MessageSquare icon for better visual design
 - **2025-01-06**: Implemented CIDR subnet checking for IP whitelist entries (supports /24, /16, etc.)
+- **2025-01-06**: Enhanced whitelist functionality to automatically deactivate blacklist indicators when whitelist entries are added
+- **2025-01-06**: Added whitelist blocks tracking system to record when indicators from feeds are blocked by existing whitelist entries
+- **2025-01-06**: Implemented "Recent Whitelist Blocks" section showing indicators that were attempted to be added to blacklist but blocked by whitelist
+- **2025-01-06**: Added multi-select functionality to Indicators tab with checkboxes, select-all, and bulk operations (activate, deactivate, delete)
+- **2025-01-06**: Enhanced pagination with configurable page size options (25, 50, 100, 250, 500 items per page)
+- **2025-01-06**: Added comprehensive pagination controls with First, Previous, page numbers, Next, and Last buttons with ellipsis for large datasets
+- **2025-01-06**: Added multi-select functionality to Whitelist table with checkboxes, select-all, and bulk delete operations
 
 ## Project Architecture
 

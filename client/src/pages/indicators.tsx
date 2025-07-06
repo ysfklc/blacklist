@@ -42,6 +42,8 @@ export default function Indicators() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedIndicator, setSelectedIndicator] = useState<Indicator | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedIndicators, setSelectedIndicators] = useState<number[]>([]);
+  const [selectAll, setSelectAll] = useState(false);
   const [filters, setFilters] = useState({
     type: "all",
     status: "all",
@@ -50,6 +52,7 @@ export default function Indicators() {
   });
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -70,11 +73,11 @@ export default function Indicators() {
   }, [debouncedUpdateSearch]);
 
   const { data: indicators, isLoading } = useQuery({
-    queryKey: ["/api/indicators", page, filters],
+    queryKey: ["/api/indicators", page, pageSize, filters],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: "50",
+        limit: pageSize.toString(),
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v && v !== "all")),
       });
       const response = await fetch(`/api/indicators?${params}`, {
@@ -197,6 +200,69 @@ export default function Indicators() {
     if (confirm("Are you sure you want to delete this indicator?")) {
       deleteMutation.mutate(id);
     }
+  };
+
+  // Multi-select handlers
+  const handleSelectIndicator = (id: number) => {
+    setSelectedIndicators(prev => 
+      prev.includes(id) 
+        ? prev.filter(indicatorId => indicatorId !== id)
+        : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectAll) {
+      setSelectedIndicators([]);
+      setSelectAll(false);
+    } else {
+      const allIndicatorIds = indicators?.data?.map((indicator: Indicator) => indicator.id) || [];
+      setSelectedIndicators(allIndicatorIds);
+      setSelectAll(true);
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIndicators.length === 0) return;
+    
+    const confirmMessage = `Are you sure you want to delete ${selectedIndicators.length} selected indicators?`;
+    if (confirm(confirmMessage)) {
+      // For now, delete one by one - in a real app, you might want a bulk delete API
+      selectedIndicators.forEach(id => deleteMutation.mutate(id));
+      setSelectedIndicators([]);
+      setSelectAll(false);
+    }
+  };
+
+  const handleBulkToggleStatus = (activate: boolean) => {
+    if (selectedIndicators.length === 0) return;
+    
+    const action = activate ? "activate" : "deactivate";
+    const confirmMessage = `Are you sure you want to ${action} ${selectedIndicators.length} selected indicators?`;
+    if (confirm(confirmMessage)) {
+      selectedIndicators.forEach(id => {
+        updateMutation.mutate({
+          id,
+          data: { isActive: activate },
+        });
+      });
+      setSelectedIndicators([]);
+      setSelectAll(false);
+    }
+  };
+
+  // Reset selection when data changes
+  useEffect(() => {
+    setSelectedIndicators([]);
+    setSelectAll(false);
+  }, [indicators?.data]);
+
+  // Handle page size change
+  const handlePageSizeChange = (newPageSize: string) => {
+    setPageSize(parseInt(newPageSize));
+    setPage(1); // Reset to first page when changing page size
+    setSelectedIndicators([]);
+    setSelectAll(false);
   };
 
   const handleViewDetails = (indicator: Indicator) => {
@@ -387,12 +453,73 @@ export default function Indicators() {
           </CardContent>
         </Card>
 
+        {/* Bulk Actions */}
+        {selectedIndicators.length > 0 && (
+          <Card className="mt-6 border-blue-200 bg-blue-50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <span className="text-sm font-medium text-blue-800">
+                    {selectedIndicators.length} indicator{selectedIndicators.length > 1 ? 's' : ''} selected
+                  </span>
+                  <div className="flex space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBulkToggleStatus(true)}
+                      disabled={updateMutation.isPending}
+                    >
+                      Activate Selected
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleBulkToggleStatus(false)}
+                      disabled={updateMutation.isPending}
+                    >
+                      Deactivate Selected
+                    </Button>
+                    {canDelete && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete Selected
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedIndicators([]);
+                    setSelectAll(false);
+                  }}
+                >
+                  Clear Selection
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Indicators Table */}
         <Card className="mt-6">
           <CardContent className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      checked={selectAll}
+                      onCheckedChange={handleSelectAll}
+                      aria-label="Select all indicators"
+                    />
+                  </TableHead>
                   <TableHead>Indicator</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Source</TableHead>
@@ -405,13 +532,20 @@ export default function Indicators() {
               <TableBody>
                 {indicators?.data?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canDelete ? 7 : 6} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-muted-foreground py-8">
                       No indicators found
                     </TableCell>
                   </TableRow>
                 ) : (
                   indicators?.data?.map((indicator: Indicator) => (
                     <TableRow key={indicator.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIndicators.includes(indicator.id)}
+                          onCheckedChange={() => handleSelectIndicator(indicator.id)}
+                          aria-label={`Select indicator ${indicator.value}`}
+                        />
+                      </TableCell>
                       <TableCell className="font-mono text-sm">{indicator.value}</TableCell>
                       <TableCell>
                         <Badge className={getTypeColor(indicator.type)}>
@@ -493,11 +627,36 @@ export default function Indicators() {
         {/* Pagination */}
         {indicators?.pagination && (
           <div className="mt-6 flex items-center justify-between">
-            <div className="text-sm text-gray-700">
-              Showing {indicators.pagination.start} to {indicators.pagination.end} of{" "}
-              {indicators.pagination.total} results
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-700">
+                Showing {indicators.pagination.start} to {indicators.pagination.end} of{" "}
+                {indicators.pagination.total} results
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Items per page:</span>
+                <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="250">250</SelectItem>
+                    <SelectItem value="500">500</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex items-center space-x-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+              >
+                First
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -506,6 +665,89 @@ export default function Indicators() {
               >
                 Previous
               </Button>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-1">
+                {(() => {
+                  const totalPages = Math.ceil(indicators.pagination.total / pageSize);
+                  const currentPage = page;
+                  const pages = [];
+                  
+                  // Calculate which pages to show
+                  let startPage = Math.max(1, currentPage - 2);
+                  let endPage = Math.min(totalPages, currentPage + 2);
+                  
+                  // Adjust if we're near the beginning or end
+                  if (currentPage <= 3) {
+                    endPage = Math.min(5, totalPages);
+                  }
+                  if (currentPage > totalPages - 3) {
+                    startPage = Math.max(1, totalPages - 4);
+                  }
+                  
+                  // Add first page and ellipsis if needed
+                  if (startPage > 1) {
+                    pages.push(
+                      <Button
+                        key={1}
+                        variant={1 === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(1)}
+                        className="w-10"
+                      >
+                        1
+                      </Button>
+                    );
+                    if (startPage > 2) {
+                      pages.push(
+                        <span key="ellipsis1" className="px-2 text-gray-500">
+                          ...
+                        </span>
+                      );
+                    }
+                  }
+                  
+                  // Add visible page numbers
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <Button
+                        key={i}
+                        variant={i === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(i)}
+                        className="w-10"
+                      >
+                        {i}
+                      </Button>
+                    );
+                  }
+                  
+                  // Add last page and ellipsis if needed
+                  if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                      pages.push(
+                        <span key="ellipsis2" className="px-2 text-gray-500">
+                          ...
+                        </span>
+                      );
+                    }
+                    pages.push(
+                      <Button
+                        key={totalPages}
+                        variant={totalPages === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(totalPages)}
+                        className="w-10"
+                      >
+                        {totalPages}
+                      </Button>
+                    );
+                  }
+                  
+                  return pages;
+                })()}
+              </div>
+              
               <Button
                 variant="outline"
                 size="sm"
@@ -513,6 +755,14 @@ export default function Indicators() {
                 disabled={!indicators.pagination.hasNext}
               >
                 Next
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(Math.ceil(indicators.pagination.total / pageSize))}
+                disabled={!indicators.pagination.hasNext}
+              >
+                Last
               </Button>
             </div>
           </div>

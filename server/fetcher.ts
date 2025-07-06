@@ -194,6 +194,12 @@ async function processIndicatorsInBackground(source: DataSource, indicators: str
           validIndicators.push(indicator);
         } else {
           whitelistBlocked++;
+          // Record this as a whitelist block
+          try {
+            await storage.recordWhitelistBlock(indicator, indicatorType || 'unknown', source.name, source.id);
+          } catch (error) {
+            console.warn(`Failed to record whitelist block for ${indicator}:`, error);
+          }
         }
       }
       

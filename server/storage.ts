@@ -3,6 +3,7 @@ import {
   dataSources, 
   indicators, 
   whitelist, 
+  whitelistBlocks,
   auditLogs, 
   settings,
   indicatorNotes,
@@ -14,6 +15,8 @@ import {
   type InsertIndicator,
   type WhitelistEntry,
   type InsertWhitelistEntry,
+  type WhitelistBlock,
+  type InsertWhitelistBlock,
   type AuditLog,
   type InsertAuditLog,
   type Setting,
@@ -62,9 +65,15 @@ export interface IStorage {
   getActiveIndicatorsByType(type: string): Promise<{ value: string }[]>;
 
   // Whitelist operations
-  getWhitelist(): Promise<WhitelistEntry[]>;
+  getWhitelist(): Promise<any[]>;
   createWhitelistEntry(entry: InsertWhitelistEntry): Promise<WhitelistEntry>;
   deleteWhitelistEntry(id: number): Promise<void>;
+  deactivateIndicatorsFromWhitelist(value: string, type: string): Promise<number>;
+  
+  // Whitelist blocks operations
+  getWhitelistBlocks(page: number, limit: number): Promise<any>;
+  createWhitelistBlock(block: InsertWhitelistBlock): Promise<WhitelistBlock>;
+  recordWhitelistBlock(value: string, type: string, source: string, sourceId?: number): Promise<void>;
 
   // Audit log operations
   getAuditLogs(page: number, limit: number, filters: any): Promise<any>;
@@ -580,7 +589,7 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
-  async getWhitelist(): Promise<WhitelistEntry[]> {
+  async getWhitelist(): Promise<any[]> {
     return await db
       .select({
         id: whitelist.id,
@@ -602,11 +611,84 @@ export class DatabaseStorage implements IStorage {
       .insert(whitelist)
       .values(entry)
       .returning();
+    
     return created;
   }
 
   async deleteWhitelistEntry(id: number): Promise<void> {
     await db.delete(whitelist).where(eq(whitelist.id, id));
+  }
+
+  async deactivateIndicatorsFromWhitelist(value: string, type: string): Promise<number> {
+    let deactivatedCount = 0;
+
+    if (type === 'ip' && value.includes('/')) {
+      // Handle CIDR range deactivation
+      try {
+        const cidr = new CIDR(value);
+        
+        // Get all active IP indicators
+        const activeIps = await db
+          .select({ id: indicators.id, value: indicators.value })
+          .from(indicators)
+          .where(and(
+            eq(indicators.type, 'ip'),
+            eq(indicators.isActive, true)
+          ));
+
+        // Find IPs that fall within the CIDR range
+        const ipsToDeactivate = activeIps.filter(ip => {
+          try {
+            return cidr.contains(ip.value);
+          } catch {
+            return false; // Skip invalid IPs
+          }
+        });
+
+        if (ipsToDeactivate.length > 0) {
+          const idsToDeactivate = ipsToDeactivate.map(ip => ip.id);
+          
+          // Deactivate indicators
+          await db
+            .update(indicators)
+            .set({ 
+              isActive: false,
+              updatedAt: new Date(),
+              notes: sql`COALESCE(notes, '') || CASE 
+                WHEN COALESCE(notes, '') = '' THEN 'Deactivated due to whitelist entry: ' || ${value} || ' (added by system)'
+                ELSE E'\n' || 'Deactivated due to whitelist entry: ' || ${value} || ' (added by system)'
+              END`
+            })
+            .where(inArray(indicators.id, idsToDeactivate));
+
+          deactivatedCount = ipsToDeactivate.length;
+        }
+      } catch (error) {
+        console.warn(`Invalid CIDR format: ${value}`);
+      }
+    } else {
+      // Handle exact match deactivation
+      const result = await db
+        .update(indicators)
+        .set({ 
+          isActive: false,
+          updatedAt: new Date(),
+          notes: sql`COALESCE(notes, '') || CASE 
+            WHEN COALESCE(notes, '') = '' THEN 'Deactivated due to whitelist entry: ' || ${value} || ' (added by system)'
+            ELSE E'\n' || 'Deactivated due to whitelist entry: ' || ${value} || ' (added by system)'
+          END`
+        })
+        .where(and(
+          eq(indicators.value, value),
+          eq(indicators.type, type),
+          eq(indicators.isActive, true)
+        ))
+        .returning({ id: indicators.id });
+
+      deactivatedCount = result.length;
+    }
+
+    return deactivatedCount;
   }
 
   async getAuditLogs(page: number, limit: number, filters: any): Promise<any> {
@@ -814,6 +896,103 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(indicatorNotes)
       .where(eq(indicatorNotes.id, id));
+  }
+
+  async getWhitelistBlocks(page: number, limit: number): Promise<any> {
+    const offset = (page - 1) * limit;
+    
+    const [totalCount] = await db
+      .select({ count: count() })
+      .from(whitelistBlocks);
+
+    const data = await db
+      .select({
+        id: whitelistBlocks.id,
+        value: whitelistBlocks.value,
+        type: whitelistBlocks.type,
+        source: whitelistBlocks.source,
+        attemptedAt: whitelistBlocks.attemptedAt,
+        blockedReason: whitelistBlocks.blockedReason,
+        sourceName: dataSources.name,
+        whitelistValue: whitelist.value,
+      })
+      .from(whitelistBlocks)
+      .leftJoin(dataSources, eq(whitelistBlocks.sourceId, dataSources.id))
+      .leftJoin(whitelist, eq(whitelistBlocks.whitelistEntryId, whitelist.id))
+      .orderBy(desc(whitelistBlocks.attemptedAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: totalCount.count,
+        start: offset + 1,
+        end: Math.min(offset + limit, totalCount.count),
+        hasNext: offset + limit < totalCount.count,
+      },
+    };
+  }
+
+  async createWhitelistBlock(block: InsertWhitelistBlock): Promise<WhitelistBlock> {
+    const [created] = await db
+      .insert(whitelistBlocks)
+      .values(block)
+      .returning();
+    return created;
+  }
+
+  async recordWhitelistBlock(value: string, type: string, source: string, sourceId?: number): Promise<void> {
+    // Find the whitelist entry that blocked this indicator
+    let whitelistEntryId: number | undefined;
+    
+    if (type === 'ip' && await this.isWhitelisted(value, type)) {
+      // For IP addresses, find the matching whitelist entry (including CIDR ranges)
+      const whitelistEntries = await db
+        .select({ id: whitelist.id, value: whitelist.value })
+        .from(whitelist)
+        .where(eq(whitelist.type, 'ip'));
+
+      for (const entry of whitelistEntries) {
+        if (entry.value === value) {
+          whitelistEntryId = entry.id;
+          break;
+        }
+        
+        if (entry.value.includes('/')) {
+          try {
+            const cidr = new CIDR(entry.value);
+            if (cidr.contains(value)) {
+              whitelistEntryId = entry.id;
+              break;
+            }
+          } catch {
+            // Skip invalid CIDR entries
+          }
+        }
+      }
+    } else {
+      // For other types, find exact match
+      const [entry] = await db
+        .select({ id: whitelist.id })
+        .from(whitelist)
+        .where(and(
+          eq(whitelist.value, value),
+          eq(whitelist.type, type)
+        ));
+      whitelistEntryId = entry?.id;
+    }
+
+    await this.createWhitelistBlock({
+      value,
+      type,
+      source,
+      sourceId,
+      whitelistEntryId,
+      blockedReason: `Blocked by whitelist entry during feed processing`,
+    });
   }
 }
 
