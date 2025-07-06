@@ -84,6 +84,17 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const indicatorNotes = pgTable("indicator_notes", {
+  id: serial("id").primaryKey(),
+  indicatorId: integer("indicator_id").notNull().references(() => indicators.id, { onDelete: "cascade" }),
+  userId: integer("user_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  isEdited: boolean("is_edited").notNull().default(false),
+  editedAt: timestamp("edited_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   dataSources: many(dataSources),
@@ -91,6 +102,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   whitelistEntries: many(whitelist),
   auditLogs: many(auditLogs),
   sessions: many(sessions),
+  indicatorNotes: many(indicatorNotes),
 }));
 
 export const dataSourcesRelations = relations(dataSources, ({ one, many }) => ({
@@ -101,7 +113,7 @@ export const dataSourcesRelations = relations(dataSources, ({ one, many }) => ({
   indicators: many(indicators),
 }));
 
-export const indicatorsRelations = relations(indicators, ({ one }) => ({
+export const indicatorsRelations = relations(indicators, ({ one, many }) => ({
   createdBy: one(users, {
     fields: [indicators.createdBy],
     references: [users.id],
@@ -109,6 +121,18 @@ export const indicatorsRelations = relations(indicators, ({ one }) => ({
   source: one(dataSources, {
     fields: [indicators.sourceId],
     references: [dataSources.id],
+  }),
+  notes: many(indicatorNotes),
+}));
+
+export const indicatorNotesRelations = relations(indicatorNotes, ({ one }) => ({
+  indicator: one(indicators, {
+    fields: [indicatorNotes.indicatorId],
+    references: [indicators.id],
+  }),
+  user: one(users, {
+    fields: [indicatorNotes.userId],
+    references: [users.id],
   }),
 }));
 
@@ -173,6 +197,14 @@ export const insertSessionSchema = createInsertSchema(sessions).omit({
   createdAt: true,
 });
 
+export const insertIndicatorNoteSchema = createInsertSchema(indicatorNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  isEdited: true,
+  editedAt: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -188,3 +220,5 @@ export type Setting = typeof settings.$inferSelect;
 export type InsertSetting = z.infer<typeof insertSettingSchema>;
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
+export type IndicatorNote = typeof indicatorNotes.$inferSelect;
+export type InsertIndicatorNote = z.infer<typeof insertIndicatorNoteSchema>;

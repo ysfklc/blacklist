@@ -19,11 +19,15 @@ import NotFound from "@/pages/not-found";
 import Sidebar from "./components/layout/sidebar";
 import Topbar from "./components/layout/topbar";
 import { useAuth } from "./hooks/use-auth";
+import { useAutoRefresh } from "./hooks/use-navigation";
 import { cn } from "./lib/utils";
 
 function AppContent() {
   const { user, isLoading } = useAuth();
   const { isCollapsed } = useSidebar();
+  
+  // Auto-refresh data when navigating between pages
+  useAutoRefresh();
 
   if (isLoading) {
     return (

@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { authenticateToken, requireRole, hashPassword } from "./auth";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { insertUserSchema, insertDataSourceSchema, insertIndicatorSchema, insertWhitelistSchema } from "@shared/schema";
+import { insertUserSchema, insertDataSourceSchema, insertIndicatorSchema, insertWhitelistSchema, insertIndicatorNoteSchema } from "@shared/schema";
 import { z } from "zod";
 import fs from "fs/promises";
 import path from "path";
@@ -618,6 +618,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Indicator deleted" });
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Indicator notes routes
+  app.get("/api/indicators/:id/notes", authenticateToken, async (req, res) => {
+    try {
+      const indicatorId = parseInt(req.params.id);
+      const notes = await storage.getIndicatorNotes(indicatorId);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/indicators/:id/notes", authenticateToken, requireRole(["admin", "user", "reporter"]), async (req, res) => {
+    try {
+      const indicatorId = parseInt(req.params.id);
+      const validatedData = insertIndicatorNoteSchema.parse({
+        ...req.body,
+        indicatorId,
+        userId: req.user.userId,
+      });
+
+      const note = await storage.createIndicatorNote(validatedData);
+      
+      await storage.createAuditLog({
+        level: "info",
+        action: "create",
+        resource: "indicator_note",
+        resourceId: note.id.toString(),
+        details: `Added note to indicator ${indicatorId}`,
+        userId: req.user.userId,
+        ipAddress: req.ip,
+      });
+
+      res.json(note);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({ error: "Invalid data", details: error.errors });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
+  app.put("/api/indicator-notes/:id", authenticateToken, requireRole(["admin", "user", "reporter"]), async (req, res) => {
+    try {
+      const noteId = parseInt(req.params.id);
+      const { content } = req.body;
+
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ error: "Content is required" });
+      }
+
+      const note = await storage.updateIndicatorNote(noteId, content, req.user.userId);
+      
+      await storage.createAuditLog({
+        level: "info",
+        action: "update",
+        resource: "indicator_note",
+        resourceId: noteId.toString(),
+        details: `Updated note`,
+        userId: req.user.userId,
+        ipAddress: req.ip,
+      });
+
+      res.json(note);
+    } catch (error) {
+      if (error?.message === "Note not found or access denied") {
+        res.status(403).json({ error: "Note not found or access denied" });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
+  app.delete("/api/indicator-notes/:id", authenticateToken, requireRole(["admin", "user", "reporter"]), async (req, res) => {
+    try {
+      const noteId = parseInt(req.params.id);
+      await storage.deleteIndicatorNote(noteId, req.user.userId);
+      
+      await storage.createAuditLog({
+        level: "info",
+        action: "delete",
+        resource: "indicator_note",
+        resourceId: noteId.toString(),
+        details: `Deleted note`,
+        userId: req.user.userId,
+        ipAddress: req.ip,
+      });
+
+      res.json({ message: "Note deleted" });
+    } catch (error) {
+      if (error?.message === "Note not found or access denied") {
+        res.status(403).json({ error: "Note not found or access denied" });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
     }
   });
 

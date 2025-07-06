@@ -15,6 +15,14 @@ A comprehensive threat intelligence platform built with Express.js backend and R
 - **2025-01-06**: Enhanced indicators page source filter to display actual data sources from database
 - **2025-01-06**: Updated source filter to show actual user names for manual entries instead of "manual entry"
 - **2025-01-06**: Added Next Fetch time column to Data Sources page alongside Last Fetch timestamp
+- **2025-01-06**: Implemented proper upsert logic for indicators to prevent duplicates and update timestamps
+- **2025-01-06**: Added duplicate cleanup functionality to maintain data integrity
+- **2025-01-06**: Modified bulk processing to use smaller batches for better performance and reliability
+- **2025-01-06**: Fixed data fetching issues with retry mechanism and improved connection handling
+- **2025-01-06**: Implemented synchronous processing to ensure all indicators are saved before completion
+- **2025-01-06**: Added exponential backoff and better error handling for network timeouts
+- **2025-01-06**: Implemented multi-note system for indicators with user attribution and edit tracking
+- **2025-01-06**: Added indicator details modal with notes management functionality
 
 ## Project Architecture
 

@@ -24,120 +24,154 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
   }
 
   activeFetches.add(source.id);
-  let timeoutId: NodeJS.Timeout | undefined;
   
   try {
-    console.log(`[FETCH] Starting fetch for ${source.name} from ${source.url}`);
-    
-    // Create an AbortController for timeout
-    const controller = new AbortController();
-    timeoutId = setTimeout(() => {
-      console.log(`[FETCH] Aborting fetch for ${source.name} due to timeout`);
-      controller.abort();
-    }, 120000); // 2 minutes for large datasets
-    
-    const response = await fetch(source.url, {
-      headers: {
-        'User-Agent': 'ThreatIntel-Platform/1.0',
-        'Accept': 'text/plain, */*',
-      },
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-    timeoutId = undefined;
-
-    console.log(`[FETCH] Response received: ${response.status} ${response.statusText}`);
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.text();
-    console.log(`[FETCH] Fetched ${data.length} characters from ${source.name}`);
-    
-    // Parse data immediately
-    const parsed = parseData(data);
-    console.log(`[FETCH] Parsed indicators: IPs=${parsed.ips.length}, Domains=${parsed.domains.length}, Hashes=${parsed.hashes.length}, URLs=${parsed.urls.length}`);
-    
-    // Update source status to indicate fetch is complete, processing started
-    await storage.updateDataSourceStatus(source.id, "processing", null);
-    
-    // Process indicators for each selected type
-    const processingPromises: Promise<void>[] = [];
-    
-    for (const indicatorType of source.indicatorTypes) {
-      let indicators: string[] = [];
-      let hashType: string | undefined;
-
-      switch (indicatorType) {
-        case "ip":
-          indicators = parsed.ips;
-          break;
-        case "domain":
-          indicators = parsed.domains;
-          break;
-        case "hash":
-          indicators = parsed.hashes;
-          hashType = indicators.length > 0 ? detectHashType(indicators[0]) : undefined;
-          break;
-        case "url":
-          indicators = parsed.urls;
-          break;
-      }
-      
-      if (indicators.length > 0) {
-        console.log(`[FETCH] Selected ${indicators.length} indicators for type: ${indicatorType}`);
-        
-        // Process indicators in background for this type (don't await)
-        processingPromises.push(
-          processIndicatorsInBackground(source, indicators, hashType, indicatorType)
-        );
-      } else {
-        console.log(`[FETCH] No indicators found for type: ${indicatorType}`);
-      }
-    }
-
-  } catch (error) {
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    
-    console.error(`[FETCH] Error fetching from ${source.name}:`, error);
-    
-    let errorMessage = "Unknown error";
-    if (error instanceof Error) {
-      if (error.name === 'AbortError') {
-        errorMessage = "Request timeout after 2 minutes";
-      } else if (error.message.includes('ECONNRESET')) {
-        errorMessage = "Connection reset by remote server";
-      } else if (error.message.includes('ENOTFOUND')) {
-        errorMessage = "DNS resolution failed";
-      } else if (error.message.includes('ECONNREFUSED')) {
-        errorMessage = "Connection refused";
-      } else {
-        errorMessage = error.message;
-      }
-    }
-    
-    console.log(`[FETCH] Setting error status for ${source.name}: ${errorMessage}`);
-    
-    await storage.updateDataSourceStatus(source.id, "error", errorMessage);
-
-    await storage.createAuditLog({
-      level: "error",
-      action: "fetch",
-      resource: "data_source",
-      resourceId: source.id.toString(),
-      details: `Failed to fetch from ${source.name}: ${errorMessage}`,
-      metadata: {
-        error: errorMessage,
-        url: source.url,
-      },
-    });
+    await fetchWithRetry(source);
   } finally {
     activeFetches.delete(source.id);
   }
+}
+
+async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promise<void> {
+  let lastError: Error | undefined;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[FETCH] Starting fetch for ${source.name} from ${source.url} (attempt ${attempt}/${maxRetries})`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.log(`[FETCH] Aborting fetch for ${source.name} due to timeout`);
+        controller.abort();
+      }, 60000); // 1 minute timeout per attempt
+      
+      try {
+        const response = await fetch(source.url, {
+          headers: {
+            'User-Agent': 'ThreatIntel-Platform/1.0',
+            'Accept': 'text/plain, */*',
+            'Connection': 'close',
+            'Cache-Control': 'no-cache',
+          },
+          signal: controller.signal,
+          keepalive: false,
+        });
+
+        clearTimeout(timeoutId);
+
+        console.log(`[FETCH] Response received: ${response.status} ${response.statusText}`);
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const data = await response.text();
+        console.log(`[FETCH] Fetched ${data.length} characters from ${source.name}`);
+        
+        // Parse data immediately
+        const parsed = parseData(data);
+        console.log(`[FETCH] Parsed indicators: IPs=${parsed.ips.length}, Domains=${parsed.domains.length}, Hashes=${parsed.hashes.length}, URLs=${parsed.urls.length}`);
+        
+        // Update source status to indicate fetch is complete, processing started
+        await storage.updateDataSourceStatus(source.id, "processing", null);
+        
+        // Process all indicators synchronously to ensure completion
+        await processAllIndicators(source, parsed);
+        
+        // Success - exit retry loop
+        return;
+        
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        throw fetchError;
+      }
+      
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`[FETCH] Attempt ${attempt} failed for ${source.name}:`, error);
+      
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 10000); // Exponential backoff, max 10s
+        console.log(`[FETCH] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  // All retries failed
+  if (lastError) {
+    await handleFetchError(source, lastError);
+  }
+}
+
+async function processAllIndicators(source: DataSource, parsed: ParsedIndicators): Promise<void> {
+  const allProcessingPromises: Promise<void>[] = [];
+  
+  for (const indicatorType of source.indicatorTypes) {
+    let indicators: string[] = [];
+    let hashType: string | undefined;
+
+    switch (indicatorType) {
+      case "ip":
+        indicators = parsed.ips;
+        break;
+      case "domain":
+        indicators = parsed.domains;
+        break;
+      case "hash":
+        indicators = parsed.hashes;
+        hashType = indicators.length > 0 ? detectHashType(indicators[0]) : undefined;
+        break;
+      case "url":
+        indicators = parsed.urls;
+        break;
+    }
+    
+    if (indicators.length > 0) {
+      console.log(`[FETCH] Processing ${indicators.length} indicators for type: ${indicatorType}`);
+      allProcessingPromises.push(
+        processIndicatorsInBackground(source, indicators, hashType, indicatorType)
+      );
+    } else {
+      console.log(`[FETCH] No indicators found for type: ${indicatorType}`);
+    }
+  }
+  
+  // Wait for all indicator processing to complete
+  await Promise.all(allProcessingPromises);
+  console.log(`[FETCH] All indicator processing completed for ${source.name}`);
+}
+
+async function handleFetchError(source: DataSource, error: Error): Promise<void> {
+  let errorMessage = "Unknown error";
+  if (error.name === 'AbortError') {
+    errorMessage = "Request timeout";
+  } else if (error.message.includes('ECONNRESET')) {
+    errorMessage = "Connection reset by remote server";
+  } else if (error.message.includes('ENOTFOUND')) {
+    errorMessage = "DNS resolution failed";
+  } else if (error.message.includes('ECONNREFUSED')) {
+    errorMessage = "Connection refused";
+  } else {
+    errorMessage = error.message;
+  }
+  
+  console.log(`[FETCH] Setting error status for ${source.name}: ${errorMessage}`);
+  
+  await storage.updateDataSourceStatus(source.id, "error", errorMessage);
+
+  await storage.createAuditLog({
+    level: "error",
+    action: "fetch",
+    resource: "data_source",
+    resourceId: source.id.toString(),
+    details: `Failed to fetch from ${source.name}: ${errorMessage}`,
+    metadata: {
+      error: errorMessage,
+      url: source.url,
+    },
+  });
+
 }
 
 async function processIndicatorsInBackground(source: DataSource, indicators: string[], hashType?: string, indicatorType?: string): Promise<void> {

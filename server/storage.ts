@@ -5,6 +5,7 @@ import {
   whitelist, 
   auditLogs, 
   settings,
+  indicatorNotes,
   type User, 
   type InsertUser,
   type DataSource,
@@ -16,7 +17,9 @@ import {
   type AuditLog,
   type InsertAuditLog,
   type Setting,
-  type InsertSetting
+  type InsertSetting,
+  type IndicatorNote,
+  type InsertIndicatorNote
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, count, sql, inArray } from "drizzle-orm";
@@ -72,6 +75,12 @@ export interface IStorage {
 
   // Public file stats
   getPublicFileStats(): Promise<any>;
+
+  // Indicator notes operations
+  getIndicatorNotes(indicatorId: number): Promise<any[]>;
+  createIndicatorNote(note: InsertIndicatorNote): Promise<IndicatorNote>;
+  updateIndicatorNote(id: number, content: string, userId: number): Promise<IndicatorNote>;
+  deleteIndicatorNote(id: number, userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -362,7 +371,17 @@ export class DatabaseStorage implements IStorage {
   async bulkCreateOrUpdateIndicators(indicatorsData: Partial<InsertIndicator>[]): Promise<number> {
     if (indicatorsData.length === 0) return 0;
 
-    const values = indicatorsData.map(indicator => ({
+    // Deduplicate within the batch to avoid unnecessary work
+    const uniqueIndicators = new Map<string, Partial<InsertIndicator>>();
+    
+    for (const indicator of indicatorsData) {
+      const key = `${indicator.value}:${indicator.type}`;
+      if (!uniqueIndicators.has(key)) {
+        uniqueIndicators.set(key, indicator);
+      }
+    }
+
+    const values = Array.from(uniqueIndicators.values()).map(indicator => ({
       value: indicator.value!,
       type: indicator.type!,
       hashType: indicator.hashType,
@@ -374,16 +393,76 @@ export class DatabaseStorage implements IStorage {
     }));
 
     try {
-      // Use PostgreSQL UPSERT (ON CONFLICT) for efficient bulk operations
-      const result = await db
-        .insert(indicators)
-        .values(values)
-        .onConflictDoNothing();
+      // Use PostgreSQL's UPSERT with a unique index
+      // First create the unique index if it doesn't exist
+      await db.execute(sql`
+        CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS indicators_value_type_idx 
+        ON indicators (value, type)
+      `).catch(() => {
+        // Index might already exist, that's fine
+      });
 
+      // Now use ON CONFLICT with the index
+      const result = await db.insert(indicators)
+        .values(values)
+        .onConflictDoUpdate({
+          target: [indicators.value, indicators.type],
+          set: {
+            updatedAt: new Date(),
+            source: sql`EXCLUDED.source`,
+            sourceId: sql`EXCLUDED.source_id`,
+          },
+        });
+      
       return values.length;
     } catch (error) {
-      console.error('Bulk insert error:', error);
-      throw error;
+      console.error('Bulk upsert with index failed:', error);
+      
+      // Fallback: Use a simple approach that deduplicates on the application side
+      try {
+        // Get all existing values for this batch
+        const existingValues = values.map(v => v.value);
+        const existingTypes = values.map(v => v.type);
+        
+        const existing = await db
+          .select({ value: indicators.value, type: indicators.type })
+          .from(indicators)
+          .where(
+            sql`(value, type) IN (${sql.join(
+              values.map(v => sql`(${v.value}, ${v.type})`),
+              sql`, `
+            )})`
+          );
+
+        const existingSet = new Set(existing.map(item => `${item.value}:${item.type}`));
+        
+        // Only insert truly new indicators
+        const newIndicators = values.filter(v => !existingSet.has(`${v.value}:${v.type}`));
+        
+        if (newIndicators.length > 0) {
+          await db.insert(indicators).values(newIndicators);
+        }
+        
+        // Update existing indicators
+        if (existing.length > 0) {
+          await db.execute(sql`
+            UPDATE indicators 
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE (value, type) IN (${sql.join(
+              existing.map(item => sql`(${item.value}, ${item.type})`),
+              sql`, `
+            )})
+          `);
+        }
+        
+        return values.length;
+      } catch (fallbackError) {
+        console.error('Fallback approach failed:', fallbackError);
+        
+        // Last resort: just insert and ignore conflicts
+        await db.insert(indicators).values(values).onConflictDoNothing();
+        return values.length;
+      }
     }
   }
 
@@ -617,6 +696,78 @@ export class DatabaseStorage implements IStorage {
         lastUpdate: "2 min ago",
       },
     };
+  }
+
+  // Indicator notes operations
+  async getIndicatorNotes(indicatorId: number): Promise<any[]> {
+    const notes = await db
+      .select({
+        id: indicatorNotes.id,
+        content: indicatorNotes.content,
+        isEdited: indicatorNotes.isEdited,
+        editedAt: indicatorNotes.editedAt,
+        createdAt: indicatorNotes.createdAt,
+        updatedAt: indicatorNotes.updatedAt,
+        user: {
+          id: users.id,
+          username: users.username,
+        },
+      })
+      .from(indicatorNotes)
+      .leftJoin(users, eq(indicatorNotes.userId, users.id))
+      .where(eq(indicatorNotes.indicatorId, indicatorId))
+      .orderBy(desc(indicatorNotes.createdAt));
+
+    return notes;
+  }
+
+  async createIndicatorNote(note: InsertIndicatorNote): Promise<IndicatorNote> {
+    const [newNote] = await db
+      .insert(indicatorNotes)
+      .values(note)
+      .returning();
+    return newNote;
+  }
+
+  async updateIndicatorNote(id: number, content: string, userId: number): Promise<IndicatorNote> {
+    // First check if the user owns this note
+    const [existingNote] = await db
+      .select()
+      .from(indicatorNotes)
+      .where(and(eq(indicatorNotes.id, id), eq(indicatorNotes.userId, userId)));
+
+    if (!existingNote) {
+      throw new Error("Note not found or access denied");
+    }
+
+    const [updatedNote] = await db
+      .update(indicatorNotes)
+      .set({
+        content,
+        isEdited: true,
+        editedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(indicatorNotes.id, id))
+      .returning();
+
+    return updatedNote;
+  }
+
+  async deleteIndicatorNote(id: number, userId: number): Promise<void> {
+    // First check if the user owns this note
+    const [existingNote] = await db
+      .select()
+      .from(indicatorNotes)
+      .where(and(eq(indicatorNotes.id, id), eq(indicatorNotes.userId, userId)));
+
+    if (!existingNote) {
+      throw new Error("Note not found or access denied");
+    }
+
+    await db
+      .delete(indicatorNotes)
+      .where(eq(indicatorNotes.id, id));
   }
 }
 

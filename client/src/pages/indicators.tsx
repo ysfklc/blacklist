@@ -9,13 +9,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Eye, MessageSquare } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
+import IndicatorDetailsModal from "@/components/indicator-details-modal";
 
 const indicatorSchema = z.object({
   value: z.string().min(1, "Value is required"),
@@ -38,6 +39,8 @@ interface Indicator {
 
 export default function Indicators() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedIndicator, setSelectedIndicator] = useState<Indicator | null>(null);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [filters, setFilters] = useState({
     type: "all",
     status: "all",
@@ -182,6 +185,11 @@ export default function Indicators() {
     if (confirm("Are you sure you want to delete this indicator?")) {
       deleteMutation.mutate(id);
     }
+  };
+
+  const handleViewDetails = (indicator: Indicator) => {
+    setSelectedIndicator(indicator);
+    setIsDetailsModalOpen(true);
   };
 
   const canCreate = user?.role === "admin" || user?.role === "user";
@@ -379,7 +387,7 @@ export default function Indicators() {
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Notes</TableHead>
-                  {canDelete && <TableHead className="text-right">Actions</TableHead>}
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -425,18 +433,29 @@ export default function Indicators() {
                           disabled={updateMutation.isPending}
                         />
                       </TableCell>
-                      {canDelete && (
-                        <TableCell className="text-right">
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end space-x-1">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDelete(indicator.id)}
-                            disabled={deleteMutation.isPending}
+                            onClick={() => handleViewDetails(indicator)}
+                            title="View details and notes"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Eye className="h-4 w-4" />
                           </Button>
-                        </TableCell>
-                      )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(indicator.id)}
+                              disabled={deleteMutation.isPending}
+                              title="Delete indicator"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -473,6 +492,16 @@ export default function Indicators() {
           </div>
         )}
       </div>
+
+      {/* Indicator Details Modal */}
+      <IndicatorDetailsModal
+        indicator={selectedIndicator}
+        isOpen={isDetailsModalOpen}
+        onClose={() => {
+          setIsDetailsModalOpen(false);
+          setSelectedIndicator(null);
+        }}
+      />
     </main>
   );
 }
