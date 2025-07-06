@@ -33,6 +33,7 @@ interface DataSource {
   indicatorTypes: string[];
   fetchInterval: number;
   isActive: boolean;
+  isPaused: boolean;
   lastFetch: string | null;
   lastFetchStatus: string | null;
   createdAt: string;
@@ -125,6 +126,42 @@ export default function DataSources() {
       toast({
         title: "Success",
         description: "Fetch started - data will be processed in the background",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start fetch",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const pauseMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/data-sources/${id}/pause`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/data-sources"] });
+      toast({
+        title: "Success",
+        description: "Data source paused successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to pause data source",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: (id: number) => apiRequest("POST", `/api/data-sources/${id}/resume`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/data-sources"] });
+      toast({
+        title: "Success",
+        description: "Data source resumed successfully",
       });
     },
     onError: () => {
@@ -319,13 +356,14 @@ export default function DataSources() {
                   <TableHead>Interval</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Fetch</TableHead>
+                  <TableHead>Next Fetch</TableHead>
                   {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {dataSources?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={isAdmin ? 7 : 6} className="text-center text-gray-500 py-8">
+                    <TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-gray-500 py-8">
                       No data sources configured
                     </TableCell>
                   </TableRow>
@@ -341,33 +379,39 @@ export default function DataSources() {
                       <TableCell>
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            source.isActive
-                              ? source.lastFetchStatus === "success"
-                                ? "bg-green-100 text-green-800"
-                                : source.lastFetchStatus === "error"
-                                ? "bg-red-100 text-red-800"
-                                : "bg-yellow-100 text-yellow-800"
-                              : "bg-gray-100 text-gray-800"
+                            !source.isActive
+                              ? "bg-gray-100 text-gray-800"
+                              : source.isPaused
+                              ? "bg-orange-100 text-orange-800"
+                              : source.lastFetchStatus === "success"
+                              ? "bg-green-100 text-green-800"
+                              : source.lastFetchStatus === "error"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-yellow-100 text-yellow-800"
                           }`}
                         >
                           <span
                             className={`h-1.5 w-1.5 rounded-full mr-1 ${
-                              source.isActive
-                                ? source.lastFetchStatus === "success"
-                                  ? "bg-green-400"
-                                  : source.lastFetchStatus === "error"
-                                  ? "bg-red-400"
-                                  : "bg-yellow-400"
-                                : "bg-gray-400"
+                              !source.isActive
+                                ? "bg-gray-400"
+                                : source.isPaused
+                                ? "bg-orange-400"
+                                : source.lastFetchStatus === "success"
+                                ? "bg-green-400"
+                                : source.lastFetchStatus === "error"
+                                ? "bg-red-400"
+                                : "bg-yellow-400"
                             }`}
                           ></span>
-                          {source.isActive
-                            ? source.lastFetchStatus === "success"
-                              ? "Active"
-                              : source.lastFetchStatus === "error"
-                              ? "Error"
-                              : "Pending"
-                            : "Inactive"}
+                          {!source.isActive
+                            ? "Inactive"
+                            : source.isPaused
+                            ? "Paused"
+                            : source.lastFetchStatus === "success"
+                            ? "Active"
+                            : source.lastFetchStatus === "error"
+                            ? "Error"
+                            : "Pending"}
                         </span>
                       </TableCell>
                       <TableCell className="text-sm text-gray-500">
@@ -375,15 +419,62 @@ export default function DataSources() {
                           ? new Date(source.lastFetch).toLocaleString()
                           : "Never"}
                       </TableCell>
+                      <TableCell className="text-sm text-gray-500">
+                        {source.isPaused ? (
+                          "Paused"
+                        ) : source.lastFetch ? (
+                          (() => {
+                            const lastFetchTime = new Date(source.lastFetch).getTime();
+                            const now = Date.now();
+                            const elapsedSeconds = Math.floor((now - lastFetchTime) / 1000);
+                            const remainingSeconds = Math.max(0, source.fetchInterval - elapsedSeconds);
+                            const remainingMinutes = Math.floor(remainingSeconds / 60);
+                            const remainingHours = Math.floor(remainingMinutes / 60);
+                            
+                            if (remainingSeconds <= 0) {
+                              return "Now";
+                            } else if (remainingHours > 0) {
+                              return `In ${remainingHours}h ${remainingMinutes % 60}m`;
+                            } else if (remainingMinutes > 0) {
+                              return `In ${remainingMinutes}m`;
+                            } else {
+                              return `In ${remainingSeconds}s`;
+                            }
+                          })()
+                        ) : (
+                          "Pending"
+                        )}
+                      </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
-                          <div className="flex justify-end space-x-2">
+                          <div className="flex justify-end space-x-1">
+                            {source.isPaused ? (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => resumeMutation.mutate(source.id)}
+                                disabled={resumeMutation.isPending}
+                                title="Resume Fetching"
+                              >
+                                <Play className="h-4 w-4" />
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => pauseMutation.mutate(source.id)}
+                                disabled={pauseMutation.isPending}
+                                title="Pause Fetching"
+                              >
+                                <Pause className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => fetchNowMutation.mutate(source.id)}
-                              disabled={fetchNowMutation.isPending}
-                              title="Pull Now"
+                              disabled={fetchNowMutation.isPending || source.isPaused}
+                              title={source.isPaused ? "Resume source to fetch now" : "Pull Now"}
                             >
                               <Download className="h-4 w-4" />
                             </Button>

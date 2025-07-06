@@ -142,81 +142,61 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
 
 async function processIndicatorsInBackground(source: DataSource, indicators: string[], hashType?: string, indicatorType?: string): Promise<void> {
   try {
-    console.log(`[PROCESS] Starting background processing of ${indicators.length} indicators for ${source.name}`);
+    console.log(`[PROCESS] Starting optimized processing of ${indicators.length} indicators for ${source.name}`);
     
-    // Filter out whitelisted indicators in batches
+    // Bulk filter whitelisted indicators - much faster than individual checks
+    const FILTER_BATCH_SIZE = 5000; // Larger batches for bulk operations
     const validIndicators = [];
-    const FILTER_BATCH_SIZE = 1000;
     let whitelistBlocked = 0;
     
     for (let i = 0; i < indicators.length; i += FILTER_BATCH_SIZE) {
       const batch = indicators.slice(i, i + FILTER_BATCH_SIZE);
       
+      // Use bulk whitelist check instead of individual queries
+      const whitelistedSet = await storage.bulkCheckWhitelist(batch, indicatorType || 'unknown');
+      
       for (const indicator of batch) {
-        const isWhitelisted = await storage.isWhitelisted(indicator, indicatorType || 'unknown');
-        if (!isWhitelisted) {
+        if (!whitelistedSet.has(indicator)) {
           validIndicators.push(indicator);
         } else {
           whitelistBlocked++;
         }
       }
       
-      // Progress update every 10k indicators
-      if ((i + FILTER_BATCH_SIZE) % 10000 === 0 || i + FILTER_BATCH_SIZE >= indicators.length) {
-        console.log(`[PROCESS] Filtered ${i + FILTER_BATCH_SIZE}/${indicators.length} indicators (${validIndicators.length} valid, ${whitelistBlocked} blocked)`);
-      }
+      // Progress update every batch
+      console.log(`[PROCESS] Filtered ${Math.min(i + FILTER_BATCH_SIZE, indicators.length)}/${indicators.length} indicators (${validIndicators.length} valid, ${whitelistBlocked} blocked)`);
     }
 
-    console.log(`[PROCESS] Saving ${validIndicators.length} valid indicators to database`);
+    console.log(`[PROCESS] Bulk saving ${validIndicators.length} valid indicators to database`);
     
-    // Save indicators to database in batches
-    const SAVE_BATCH_SIZE = 50; // Reduced batch size for better stability
+    // Use bulk database operations for much better performance
+    const SAVE_BATCH_SIZE = 1000; // Larger batches for bulk inserts
     let savedCount = 0;
     
     for (let i = 0; i < validIndicators.length; i += SAVE_BATCH_SIZE) {
       const batch = validIndicators.slice(i, i + SAVE_BATCH_SIZE);
-      console.log(`[PROCESS] Processing batch ${Math.floor(i/SAVE_BATCH_SIZE) + 1}/${Math.ceil(validIndicators.length/SAVE_BATCH_SIZE)}: indicators ${i+1}-${Math.min(i+SAVE_BATCH_SIZE, validIndicators.length)}`);
       
       try {
-        // Process batch with Promise.allSettled for better error handling
-        const results = await Promise.allSettled(
-          batch.map(indicator => 
-            storage.createOrUpdateIndicator({
-              value: indicator,
-              type: indicatorType || 'unknown',
-              hashType,
-              source: source.name,
-              sourceId: source.id,
-              isActive: true,
-              createdBy: 1, // Default to admin user for system fetches
-            })
-          )
-        );
+        // Prepare batch data for bulk insert
+        const batchData = batch.map(indicator => ({
+          value: indicator,
+          type: indicatorType || 'unknown',
+          hashType,
+          source: source.name,
+          sourceId: source.id,
+          isActive: true,
+          createdBy: 1, // Default to admin user for system fetches
+        }));
         
-        const successful = results.filter(r => r.status === 'fulfilled').length;
-        const failed = results.filter(r => r.status === 'rejected');
+        // Use bulk insert/update operation
+        const batchSavedCount = await storage.bulkCreateOrUpdateIndicators(batchData);
+        savedCount += batchSavedCount;
         
-        if (failed.length > 0) {
-          console.log(`[PROCESS] Batch had ${failed.length} failures:`);
-          failed.slice(0, 3).forEach((failure, index) => {
-            console.log(`[PROCESS] Error ${index + 1}:`, failure.reason);
-          });
-        }
-        
-        savedCount += successful;
-        
-        // Progress update every 1k saved
-        if (savedCount % 1000 === 0 || i + SAVE_BATCH_SIZE >= validIndicators.length) {
-          console.log(`[PROCESS] Saved ${savedCount}/${validIndicators.length} indicators (batch ${Math.floor(i/SAVE_BATCH_SIZE) + 1})`);
-        }
-        
-        // Small delay between batches to prevent overwhelming the database
-        if (i + SAVE_BATCH_SIZE < validIndicators.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
+        console.log(`[PROCESS] Bulk saved batch ${Math.floor(i/SAVE_BATCH_SIZE) + 1}/${Math.ceil(validIndicators.length/SAVE_BATCH_SIZE)}: ${batchSavedCount} indicators (total: ${savedCount}/${validIndicators.length})`);
         
       } catch (error) {
-        console.error(`[PROCESS] Error saving batch starting at ${i}:`, error);
+        console.error(`[PROCESS] Error in bulk save for batch starting at ${i}:`, error);
+        // If bulk operation fails, we could fall back to individual inserts, but for now just log and continue
       }
     }
     

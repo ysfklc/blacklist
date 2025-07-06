@@ -19,7 +19,7 @@ import {
   type InsertSetting
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, ilike, desc, count, sql } from "drizzle-orm";
+import { eq, and, or, ilike, desc, count, sql, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations
@@ -42,14 +42,19 @@ export interface IStorage {
   updateDataSource(id: number, data: Partial<DataSource>): Promise<DataSource>;
   deleteDataSource(id: number): Promise<void>;
   updateDataSourceStatus(id: number, status: string, error: string | null): Promise<void>;
+  pauseDataSource(id: number): Promise<void>;
+  resumeDataSource(id: number): Promise<void>;
 
   // Indicator operations
   getIndicators(page: number, limit: number, filters: any): Promise<any>;
   createIndicator(indicator: InsertIndicator): Promise<Indicator>;
   createOrUpdateIndicator(indicator: Partial<InsertIndicator>): Promise<Indicator>;
+  bulkCreateOrUpdateIndicators(indicators: Partial<InsertIndicator>[]): Promise<number>;
   updateIndicator(id: number, data: Partial<Indicator>): Promise<Indicator>;
   deleteIndicator(id: number): Promise<void>;
   isWhitelisted(value: string, type: string): Promise<boolean>;
+  bulkCheckWhitelist(values: string[], type: string): Promise<Set<string>>;
+  getDistinctIndicatorSources(): Promise<any[]>;
   getActiveIndicatorsByType(type: string): Promise<{ value: string }[]>;
 
   // Whitelist operations
@@ -143,7 +148,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: dataSources.id,
         name: dataSources.name,
-        indicatorType: dataSources.indicatorType,
+        indicatorTypes: dataSources.indicatorTypes,
         lastFetchStatus: dataSources.lastFetchStatus,
         lastFetch: dataSources.lastFetch,
         fetchInterval: dataSources.fetchInterval,
@@ -178,7 +183,7 @@ export class DatabaseStorage implements IStorage {
       dataSourcesStatus: dataSourcesStatus.map(source => ({
         id: source.id,
         name: source.name,
-        type: source.indicatorType,
+        type: source.indicatorTypes ? source.indicatorTypes.join(', ') : 'unknown',
         status: source.lastFetchStatus || 'pending',
         lastFetch: source.lastFetch ? new Date(source.lastFetch).toLocaleString() : 'Never',
         nextFetch: source.lastFetch ? 
@@ -228,6 +233,20 @@ export class DatabaseStorage implements IStorage {
       .where(eq(dataSources.id, id));
   }
 
+  async pauseDataSource(id: number): Promise<void> {
+    await db
+      .update(dataSources)
+      .set({ isPaused: true })
+      .where(eq(dataSources.id, id));
+  }
+
+  async resumeDataSource(id: number): Promise<void> {
+    await db
+      .update(dataSources)
+      .set({ isPaused: false })
+      .where(eq(dataSources.id, id));
+  }
+
   async getIndicators(page: number, limit: number, filters: any): Promise<any> {
     const offset = (page - 1) * limit;
     const conditions = [];
@@ -255,8 +274,22 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause);
 
     const data = await db
-      .select()
+      .select({
+        id: indicators.id,
+        value: indicators.value,
+        type: indicators.type,
+        hashType: indicators.hashType,
+        source: indicators.source,
+        sourceId: indicators.sourceId,
+        isActive: indicators.isActive,
+        notes: indicators.notes,
+        createdAt: indicators.createdAt,
+        updatedAt: indicators.updatedAt,
+        createdBy: indicators.createdBy,
+        createdByUser: users.username,
+      })
       .from(indicators)
+      .leftJoin(users, eq(indicators.createdBy, users.id))
       .where(whereClause)
       .orderBy(desc(indicators.createdAt))
       .limit(limit)
@@ -324,6 +357,66 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  async bulkCreateOrUpdateIndicators(indicatorsData: Partial<InsertIndicator>[]): Promise<number> {
+    if (indicatorsData.length === 0) return 0;
+
+    const values = indicatorsData.map(indicator => ({
+      value: indicator.value!,
+      type: indicator.type!,
+      hashType: indicator.hashType,
+      source: indicator.source || 'unknown',
+      sourceId: indicator.sourceId,
+      isActive: indicator.isActive ?? true,
+      notes: indicator.notes,
+      createdBy: indicator.createdBy || 1,
+    }));
+
+    try {
+      // Use PostgreSQL UPSERT (ON CONFLICT) for efficient bulk operations
+      const result = await db
+        .insert(indicators)
+        .values(values)
+        .onConflictDoNothing();
+
+      return values.length;
+    } catch (error) {
+      console.error('Bulk insert error:', error);
+      throw error;
+    }
+  }
+
+  async bulkCheckWhitelist(values: string[], type: string): Promise<Set<string>> {
+    if (values.length === 0) return new Set();
+
+    const whitelistedItems = await db
+      .select({ value: whitelist.value })
+      .from(whitelist)
+      .where(and(
+        inArray(whitelist.value, values),
+        eq(whitelist.type, type)
+      ));
+
+    return new Set(whitelistedItems.map(item => item.value));
+  }
+
+  async getDistinctIndicatorSources(): Promise<any[]> {
+    // Get distinct sources from indicators with user information for manual entries
+    const sources = await db
+      .selectDistinct({
+        source: indicators.source,
+        createdByUser: users.username,
+      })
+      .from(indicators)
+      .leftJoin(users, eq(indicators.createdBy, users.id))
+      .where(sql`${indicators.source} IS NOT NULL`)
+      .orderBy(indicators.source);
+
+    return sources.map(s => ({
+      value: s.source,
+      label: s.source === 'manual' ? (s.createdByUser || 'Manual Entry') : s.source
+    }));
   }
 
   async updateIndicator(id: number, data: Partial<Indicator>): Promise<Indicator> {

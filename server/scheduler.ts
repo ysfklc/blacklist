@@ -10,6 +10,11 @@ export function initializeScheduler() {
       const dataSources = await storage.getActiveDataSources();
       
       for (const source of dataSources) {
+        // Skip paused data sources
+        if (source.isPaused) {
+          continue;
+        }
+
         const now = new Date();
         const lastFetch = source.lastFetch ? new Date(source.lastFetch) : new Date(0);
         const timeSinceLastFetch = (now.getTime() - lastFetch.getTime()) / 1000;

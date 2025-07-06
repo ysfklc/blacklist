@@ -33,6 +33,7 @@ interface Indicator {
   isActive: boolean;
   notes: string | null;
   createdAt: string;
+  createdByUser?: string;
 }
 
 export default function Indicators() {
@@ -57,6 +58,30 @@ export default function Indicators() {
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v && v !== "all")),
       });
       const response = await fetch(`/api/indicators?${params}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.json();
+    },
+  });
+
+  const { data: dataSources } = useQuery({
+    queryKey: ["/api/data-sources"],
+    queryFn: async () => {
+      const response = await fetch("/api/data-sources", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      return response.json();
+    },
+  });
+
+  const { data: indicatorSources } = useQuery({
+    queryKey: ["/api/indicators/sources"],
+    queryFn: async () => {
+      const response = await fetch("/api/indicators/sources", {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -323,7 +348,11 @@ export default function Indicators() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Sources</SelectItem>
-                    <SelectItem value="manual">Manual Entry</SelectItem>
+                    {indicatorSources?.map((source: any) => (
+                      <SelectItem key={source.value} value={source.value}>
+                        {source.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -369,7 +398,9 @@ export default function Indicators() {
                           {indicator.type.toUpperCase()}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{indicator.source}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {indicator.source === 'manual' ? (indicator.createdByUser || 'Manual Entry') : indicator.source}
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center space-x-2">
                           <Checkbox

@@ -333,6 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await storage.getDashboardStats();
       res.json(stats);
     } catch (error) {
+      console.error("Dashboard stats error:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -417,6 +418,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Pause data source endpoint
+  app.post("/api/data-sources/:id/pause", authenticateToken, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      await storage.pauseDataSource(id);
+      
+      await storage.createAuditLog({
+        level: "info",
+        action: "pause",
+        resource: "data_source",
+        resourceId: id.toString(),
+        details: `Paused data source`,
+        userId: req.user.userId,
+        ipAddress: req.ip,
+      });
+
+      res.json({ message: "Data source paused successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Resume data source endpoint
+  app.post("/api/data-sources/:id/resume", authenticateToken, requireRole(["admin"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      
+      await storage.resumeDataSource(id);
+      
+      await storage.createAuditLog({
+        level: "info",
+        action: "resume",
+        resource: "data_source",
+        resourceId: id.toString(),
+        details: `Resumed data source`,
+        userId: req.user.userId,
+        ipAddress: req.ip,
+      });
+
+      res.json({ message: "Data source resumed successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Manual fetch endpoint
   app.post("/api/data-sources/:id/fetch", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
@@ -432,6 +479,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!dataSource.isActive) {
         return res.status(400).json({ error: "Data source is not active" });
+      }
+
+      if (dataSource.isPaused) {
+        return res.status(400).json({ error: "Data source is paused" });
       }
 
       // Log the manual fetch trigger
@@ -472,6 +523,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filters
       );
       res.json(indicators);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/indicators/sources", authenticateToken, async (req, res) => {
+    try {
+      const sources = await storage.getDistinctIndicatorSources();
+      res.json(sources);
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }
