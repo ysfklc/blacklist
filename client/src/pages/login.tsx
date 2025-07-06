@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { Shield } from "lucide-react";
+import { Logo } from "@/components/ui/logo";
 import { useToast } from "@/hooks/use-toast";
 
 export default function Login() {
@@ -41,8 +41,8 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="max-w-md w-full space-y-8 p-8">
         <div className="text-center">
-          <div className="mx-auto h-16 w-16 bg-secondary rounded-full flex items-center justify-center mb-4">
-            <Shield className="h-8 w-8 text-white" />
+          <div className="mx-auto mb-4 flex justify-center">
+            <Logo size="lg" />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-white">Threat Intel Platform</h2>
           <p className="mt-2 text-sm text-gray-300">Sign in to your account</p>

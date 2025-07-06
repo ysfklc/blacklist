@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { Shield, BarChart3, Database, List, CheckCircle, Link2, FileText, Settings, User, LogOut, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { BarChart3, Database, List, CheckCircle, Link2, FileText, Settings, User, LogOut, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/ui/logo";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: BarChart3, roles: ["admin", "user", "reporter"] },
@@ -34,9 +35,7 @@ export default function Sidebar() {
     >
       <div className="flex items-center justify-between h-16 px-4" style={{ backgroundColor: 'rgb(17 24 39 / var(--tw-bg-opacity, 1))' }}>
         <div className="flex items-center">
-          <div className="h-8 w-8 bg-secondary rounded-full flex items-center justify-center">
-            <Shield className="h-5 w-5 text-white" />
-          </div>
+          <Logo size="sm" />
           {!isCollapsed && (
             <span className="ml-3 text-white text-lg font-semibold">ThreatIntel</span>
           )}

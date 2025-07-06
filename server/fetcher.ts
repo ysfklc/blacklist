@@ -14,22 +14,40 @@ const HASH_REGEX = /\b[a-fA-F0-9]{32,128}\b/g;
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
 
 export async function fetchAndParseData(source: DataSource): Promise<void> {
+  let timeoutId: NodeJS.Timeout | undefined;
+  
   try {
-    console.log(`Fetching data from ${source.url}`);
+    console.log(`[FETCH] Starting fetch for ${source.name} from ${source.url}`);
+    
+    // Create an AbortController for timeout - extended for large datasets
+    const controller = new AbortController();
+    timeoutId = setTimeout(() => {
+      console.log(`[FETCH] Aborting fetch for ${source.name} due to timeout`);
+      controller.abort();
+    }, 60000); // Increased to 60 seconds for large datasets
     
     const response = await fetch(source.url, {
       headers: {
         'User-Agent': 'ThreatIntel-Platform/1.0',
+        'Accept': 'text/plain, */*',
       },
-      timeout: 30000,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
+    timeoutId = undefined;
+
+    console.log(`[FETCH] Response received: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
     const data = await response.text();
+    console.log(`Fetched ${data.length} characters from ${source.name}`);
+    
     const parsed = parseData(data);
+    console.log(`Parsed indicators: IPs=${parsed.ips.length}, Domains=${parsed.domains.length}, Hashes=${parsed.hashes.length}, URLs=${parsed.urls.length}`);
     
     let indicators: string[] = [];
     let hashType: string | undefined;
@@ -49,6 +67,9 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
         indicators = parsed.urls;
         break;
     }
+    
+    console.log(`Selected ${indicators.length} indicators for type: ${source.indicatorType}`);
+    console.log(`[FETCH] Processing all ${indicators.length} indicators without limitation`);
 
     // Filter out whitelisted indicators
     const validIndicators = [];
@@ -71,17 +92,48 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
       }
     }
 
-    // Save indicators to database
-    for (const indicator of validIndicators) {
-      await storage.createOrUpdateIndicator({
-        value: indicator,
-        type: source.indicatorType,
-        hashType,
-        source: source.name,
-        sourceId: source.id,
-        isActive: true,
-      });
+    // Save indicators to database in batches
+    console.log(`[FETCH] Saving ${validIndicators.length} indicators to database in batches`);
+    
+    const BATCH_SIZE = 50; // Reduced batch size for better stability
+    let savedCount = 0;
+    
+    for (let i = 0; i < validIndicators.length; i += BATCH_SIZE) {
+      const batch = validIndicators.slice(i, i + BATCH_SIZE);
+      
+      try {
+        // Process batch with Promise.allSettled for better error handling
+        const results = await Promise.allSettled(
+          batch.map(indicator => 
+            storage.createOrUpdateIndicator({
+              value: indicator,
+              type: source.indicatorType,
+              hashType,
+              source: source.name,
+              sourceId: source.id,
+              isActive: true,
+            })
+          )
+        );
+        
+        const successful = results.filter(r => r.status === 'fulfilled').length;
+        savedCount += successful;
+        
+        if (savedCount % 1000 === 0 || i + BATCH_SIZE >= validIndicators.length) {
+          console.log(`[FETCH] Saved ${savedCount}/${validIndicators.length} indicators (batch ${Math.floor(i/BATCH_SIZE) + 1})`);
+        }
+        
+        // Small delay between batches to prevent overwhelming the database
+        if (i + BATCH_SIZE < validIndicators.length) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+      } catch (error) {
+        console.error(`[FETCH] Error saving batch starting at ${i}:`, error);
+      }
     }
+    
+    console.log(`[FETCH] Completed saving ${savedCount} indicators`);
 
     // Update source status
     await storage.updateDataSourceStatus(source.id, "success", null);
@@ -100,9 +152,29 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
     });
 
   } catch (error) {
-    console.error(`Error fetching from ${source.name}:`, error);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
     
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    console.error(`[FETCH] Error fetching from ${source.name}:`, error);
+    
+    let errorMessage = "Unknown error";
+    if (error instanceof Error) {
+      if (error.name === 'AbortError') {
+        errorMessage = "Request timeout after 30 seconds";
+      } else if (error.message.includes('ECONNRESET')) {
+        errorMessage = "Connection reset by remote server";
+      } else if (error.message.includes('ENOTFOUND')) {
+        errorMessage = "DNS resolution failed";
+      } else if (error.message.includes('ECONNREFUSED')) {
+        errorMessage = "Connection refused";
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
+    console.log(`[FETCH] Setting error status for ${source.name}: ${errorMessage}`);
+    
     await storage.updateDataSourceStatus(source.id, "error", errorMessage);
 
     await storage.createAuditLog({
@@ -113,6 +185,7 @@ export async function fetchAndParseData(source: DataSource): Promise<void> {
       details: `Failed to fetch from ${source.name}: ${errorMessage}`,
       metadata: {
         error: errorMessage,
+        url: source.url,
       },
     });
   }

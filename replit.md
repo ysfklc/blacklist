@@ -115,6 +115,14 @@ Changelog:
   - Regular users: View own profile and change password
   - LDAP integration: Search directory, auto-populate fields, no password input for LDAP users
   - Added firstName, lastName, email fields to user schema
+- July 06, 2025. Fixed USOM data fetching issues and optimized large dataset processing
+  - Replaced unsupported timeout with AbortController mechanism
+  - Implemented batch processing (50 indicators per batch) to prevent database overload
+  - Added rate limiting (500 indicators per fetch) to prevent system crashes
+  - Enhanced error handling for connection resets and network issues
+  - Added fetch overlap prevention in scheduler
+  - Extended timeouts for large datasets and improved retry logic
+  - Removed indicator limitation to process all 394,715 indicators without restriction
 ```
 
 ## User Preferences
