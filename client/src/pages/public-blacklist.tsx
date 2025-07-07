@@ -7,7 +7,7 @@ import {
   Hash,
   Link as LinkIcon,
 } from "lucide-react";
-import { Logo } from "@/components/ui/logo";
+import { FeedLogo } from "@/components/ui/feed-logo";
 
 interface BlacklistFiles {
   IP: string[];
@@ -106,7 +106,7 @@ export default function PublicBlacklist() {
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
-            <Logo size="sm" className="mr-3 bg-gray-200 rounded p-1" />
+            <FeedLogo size="sm" className="mr-3 bg-gray-200 rounded p-1" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
                 Public Blacklist Feeds
