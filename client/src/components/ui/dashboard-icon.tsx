@@ -4,12 +4,12 @@ interface DashboardIconProps {
 
 export function DashboardIcon({ className = "h-5 w-5" }: DashboardIconProps) {
   return (
-    <svg 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
     >

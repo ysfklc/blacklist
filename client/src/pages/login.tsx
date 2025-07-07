@@ -46,7 +46,7 @@ export default function Login() {
           <div className="mx-auto mb-4 flex justify-center">
             <Logo size="lg" />
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-white">The Blacklist</h2>
+          <h2 className="mt-6 text-3xl text-white font-extrabold">The BlackList</h2>
           <p className="mt-2 text-sm text-gray-300">Sign in to your account</p>
         </div>
 

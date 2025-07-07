@@ -14,59 +14,62 @@ export function Logo({ className, size = "md" }: LogoProps) {
 
   return (
     <div className={cn(
-      "relative flex items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-blue-700 to-purple-800 shadow-lg border border-blue-500/30",
+      "relative flex items-center justify-center",
       sizeClasses[size],
       className
     )}>
-      <svg
-        viewBox="0 0 48 48"
-        className="w-2/3 h-2/3 text-white"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
+      <svg 
+        viewBox="0 0 512 512" 
+        className="w-full h-full text-white"
+        fill="currentColor"
       >
-        {/* Modern hexagonal shield */}
-        <path d="M24 4L34 8v12c0 6-4 12-10 14-6-2-10-8-10-14V8L24 4z" 
-              fill="currentColor" 
-              stroke="none"
-              opacity="0.9"/>
+        {/* Blacklist prohibition symbol */}
+        <circle 
+          cx="256" 
+          cy="256" 
+          r="230" 
+          fill="none" 
+          stroke="currentColor" 
+          strokeWidth="32"
+        />
+        <path 
+          d="M149.7 149.7L362.3 362.3" 
+          stroke="currentColor" 
+          strokeWidth="32" 
+          strokeLinecap="round"
+        />
+        {/* Inner content - representing blocked/forbidden items */}
+        <circle cx="256" cy="256" r="180" fill="currentColor" opacity="0.1"/>
         
-        {/* Network nodes */}
-        <circle cx="24" cy="16" r="2" fill="white" opacity="0.9"/>
-        <circle cx="18" cy="22" r="1.5" fill="white" opacity="0.8"/>
-        <circle cx="30" cy="22" r="1.5" fill="white" opacity="0.8"/>
-        <circle cx="24" cy="28" r="1.5" fill="white" opacity="0.8"/>
+        {/* Digital/network elements to represent cyber security */}
+        <rect x="200" y="200" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="220" y="190" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="240" y="200" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="260" y="190" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="280" y="200" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="300" y="190" width="8" height="8" fill="currentColor" opacity="0.7"/>
         
-        {/* Network connections */}
-        <path d="M24 16 L18 22 M24 16 L30 22 M24 16 L24 28" 
-              stroke="white" 
-              strokeWidth="1" 
-              opacity="0.6"/>
-        <path d="M18 22 L30 22 M18 22 L24 28 M30 22 L24 28" 
-              stroke="white" 
-              strokeWidth="1" 
-              opacity="0.4"/>
+        <rect x="200" y="220" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="220" y="230" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="240" y="220" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="260" y="230" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="280" y="220" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="300" y="230" width="8" height="8" fill="currentColor" opacity="0.7"/>
         
-        {/* Scanning radar effect */}
-        <circle cx="24" cy="20" r="8" stroke="white" strokeWidth="1" opacity="0.3" fill="none"/>
-        <circle cx="24" cy="20" r="12" stroke="white" strokeWidth="0.5" opacity="0.2" fill="none"/>
+        <rect x="200" y="280" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="220" y="290" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="240" y="280" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="260" y="290" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="280" y="280" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="300" y="290" width="8" height="8" fill="currentColor" opacity="0.7"/>
         
-        {/* Digital elements */}
-        <rect x="16" y="32" width="2" height="2" fill="white" opacity="0.7"/>
-        <rect x="20" y="34" width="2" height="2" fill="white" opacity="0.7"/>
-        <rect x="24" y="32" width="2" height="2" fill="white" opacity="0.7"/>
-        <rect x="28" y="34" width="2" height="2" fill="white" opacity="0.7"/>
-        
-        {/* Data streams */}
-        <path d="M12 38 L18 38 M20 38 L24 38 M26 38 L30 38 M32 38 L36 38" 
-              stroke="white" 
-              strokeWidth="1" 
-              strokeLinecap="round" 
-              opacity="0.4"/>
+        <rect x="200" y="300" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="220" y="310" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="240" y="300" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="260" y="310" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="280" y="300" width="8" height="8" fill="currentColor" opacity="0.7"/>
+        <rect x="300" y="310" width="8" height="8" fill="currentColor" opacity="0.7"/>
       </svg>
-      
-      {/* Subtle glow effect */}
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-blue-500/20 to-purple-700/20 blur-sm -z-10"></div>
     </div>
   );
 }

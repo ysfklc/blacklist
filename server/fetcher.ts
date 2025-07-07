@@ -1,5 +1,7 @@
 import { DataSource } from "@shared/schema";
 import { storage } from "./storage";
+import { HttpProxyAgent } from "http-proxy-agent";
+import { HttpsProxyAgent } from "https-proxy-agent";
 
 interface ParsedIndicators {
   ips: string[];
@@ -46,6 +48,27 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
       }, 60000); // 1 minute timeout per attempt
       
       try {
+        // Get proxy settings from storage
+        const proxySettings = await getProxySettings();
+        let agent: any = undefined;
+        
+        if (proxySettings.enabled && proxySettings.host && proxySettings.port) {
+          const proxyUrl = `http://${proxySettings.host}:${proxySettings.port}`;
+          const proxyAuth = proxySettings.username && proxySettings.password 
+            ? `${proxySettings.username}:${proxySettings.password}@`
+            : '';
+          const fullProxyUrl = `http://${proxyAuth}${proxySettings.host}:${proxySettings.port}`;
+          
+          // Choose the appropriate agent based on the target URL protocol
+          if (source.url.startsWith('https:')) {
+            agent = new HttpsProxyAgent(fullProxyUrl);
+          } else {
+            agent = new HttpProxyAgent(fullProxyUrl);
+          }
+          
+          console.log(`[FETCH] Using proxy: ${proxyUrl}`);
+        }
+        
         const response = await fetch(source.url, {
           headers: {
             'User-Agent': 'ThreatIntel-Platform/1.0',
@@ -55,6 +78,7 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
           },
           signal: controller.signal,
           keepalive: false,
+          agent,
         });
 
         clearTimeout(timeoutId);
@@ -302,5 +326,38 @@ function detectHashType(hash: string): string {
       return "sha512";
     default:
       return "unknown";
+  }
+}
+
+async function getProxySettings(): Promise<{
+  enabled: boolean;
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+}> {
+  try {
+    const settings = await storage.getSettings();
+    const settingsMap = settings.reduce((acc, setting) => {
+      acc[setting.key] = setting.value;
+      return acc;
+    }, {} as Record<string, string>);
+    
+    return {
+      enabled: settingsMap["proxy.enabled"] === "true",
+      host: settingsMap["proxy.host"] || "",
+      port: parseInt(settingsMap["proxy.port"] || "8080"),
+      username: settingsMap["proxy.username"] || "",
+      password: settingsMap["proxy.password"] || "",
+    };
+  } catch (error) {
+    console.error("[FETCH] Error getting proxy settings:", error);
+    return {
+      enabled: false,
+      host: "",
+      port: 8080,
+      username: "",
+      password: "",
+    };
   }
 }
