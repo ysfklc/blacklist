@@ -4,6 +4,8 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-07**: Updated logo and favicon to use custom user-provided blacklist icon image across application
+- **2025-07-07**: Successfully completed migration from Replit Agent to Replit environment with PostgreSQL database setup
 - **2025-07-07**: Implemented user avatars using initials from first/last names with consistent color generation
   - Created UserAvatar component that generates initials from firstName/lastName or username
   - Added color-coded backgrounds based on user identifiers for consistency
