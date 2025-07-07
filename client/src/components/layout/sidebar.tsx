@@ -12,7 +12,7 @@ const navigation = [
   { name: "Indicators", href: "/indicators", icon: List, roles: ["admin", "user", "reporter"] },
   { name: "Whitelist", href: "/whitelist", icon: CheckCircle, roles: ["admin", "user", "reporter"] },
   { name: "Public Links", href: "/public-links", icon: Link2, roles: ["admin", "user", "reporter"] },
-  { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["admin", "user"] },
+  { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["admin"] },
   { name: "Users", href: "/users", icon: Users, roles: ["admin", "user", "reporter"] },
   { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
 ];

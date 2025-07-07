@@ -28,13 +28,14 @@ export default function Settings() {
     bindDN: "",
     password: "",
     enabled: false,
+    trustAllCertificates: false,
   });
 
   const [systemSettings, setSystemSettings] = useState({
     defaultFetchInterval: 3600,
     maxFileSize: 100000,
     logRetention: 90,
-    blacklistUpdateInterval: 5,
+    blacklistUpdateInterval: 300,
   });
 
   const { toast } = useToast();
@@ -60,6 +61,7 @@ export default function Settings() {
         bindDN: settingsMap["ldap.bindDN"] || "",
         password: settingsMap["ldap.password"] || "",
         enabled: settingsMap["ldap.enabled"] === "true",
+        trustAllCertificates: settingsMap["ldap.trustAllCertificates"] === "true",
       });
 
       // Update system settings
@@ -67,7 +69,7 @@ export default function Settings() {
         defaultFetchInterval: parseInt(settingsMap["system.defaultFetchInterval"] || "3600"),
         maxFileSize: parseInt(settingsMap["system.maxFileSize"] || "100000"),
         logRetention: parseInt(settingsMap["system.logRetention"] || "90"),
-        blacklistUpdateInterval: parseInt(settingsMap["system.blacklistUpdateInterval"] || "5"),
+        blacklistUpdateInterval: parseInt(settingsMap["system.blacklistUpdateInterval"] || "300"),
       });
     }
   }, [settings]);
@@ -80,6 +82,7 @@ export default function Settings() {
       "ldap.bindDN": ldapSettings.bindDN,
       "ldap.password": ldapSettings.password,
       "ldap.enabled": ldapSettings.enabled.toString(),
+      "ldap.trustAllCertificates": ldapSettings.trustAllCertificates.toString(),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
@@ -217,13 +220,23 @@ export default function Settings() {
                   />
                 </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="ldap-enabled"
-                  checked={ldapSettings.enabled}
-                  onCheckedChange={(checked) => setLdapSettings({ ...ldapSettings, enabled: !!checked })}
-                />
-                <Label htmlFor="ldap-enabled">Enable LDAP Authentication</Label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="ldap-enabled"
+                    checked={ldapSettings.enabled}
+                    onCheckedChange={(checked) => setLdapSettings({ ...ldapSettings, enabled: !!checked })}
+                  />
+                  <Label htmlFor="ldap-enabled">Enable LDAP Authentication</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="ldap-trust-certificates"
+                    checked={ldapSettings.trustAllCertificates}
+                    onCheckedChange={(checked) => setLdapSettings({ ...ldapSettings, trustAllCertificates: !!checked })}
+                  />
+                  <Label htmlFor="ldap-trust-certificates">Trust All Certificates (Ignore SSL/TLS errors)</Label>
+                </div>
               </div>
               <div className="flex justify-between">
                 <Button
@@ -284,12 +297,12 @@ export default function Settings() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="blacklist-update-interval">Blacklist Update Interval (minutes)</Label>
+                  <Label htmlFor="blacklist-update-interval">Blacklist Update Interval (seconds)</Label>
                   <Input
                     id="blacklist-update-interval"
                     type="number"
                     value={systemSettings.blacklistUpdateInterval}
-                    onChange={(e) => setSystemSettings({ ...systemSettings, blacklistUpdateInterval: parseInt(e.target.value) || 5 })}
+                    onChange={(e) => setSystemSettings({ ...systemSettings, blacklistUpdateInterval: parseInt(e.target.value) || 300 })}
                   />
                 </div>
               </div>

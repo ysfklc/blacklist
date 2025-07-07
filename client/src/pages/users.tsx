@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Trash2, Edit, Plus, Eye, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -94,6 +95,8 @@ export default function Users() {
   const [ldapResults, setLdapResults] = useState<LdapUser[]>([]);
   const [selectedLdapUser, setSelectedLdapUser] = useState<LdapUser | null>(null);
   const [showLdapSearch, setShowLdapSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
 
   const isAdmin = user?.role === "admin";
 
@@ -103,8 +106,32 @@ export default function Users() {
     enabled: !!user,
   });
 
+  // Fetch settings to check if LDAP is enabled
+  const { data: settings } = useQuery({
+    queryKey: ["/api/settings"],
+    enabled: isAdmin, // Only admins can view settings
+  });
+
+  // Check if LDAP is enabled
+  const isLdapEnabled = settings && settings.some((setting: any) => 
+    setting.key === "ldap.enabled" && setting.value === "true"
+  );
+
   // Convert single user profile to array format for consistent rendering
-  const userList: SystemUser[] = isAdmin ? (users || []) : (users ? [users] : []);
+  const allUsers: SystemUser[] = isAdmin ? (users || []) : (users ? [users] : []);
+  
+  // Filter users based on search query and role filter
+  const userList = allUsers.filter((user) => {
+    const matchesSearch = !searchQuery || 
+      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (user.firstName && user.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (user.lastName && user.lastName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    const matchesRole = roleFilter === "all" || user.role === roleFilter;
+    
+    return matchesSearch && matchesRole;
+  });
 
   const createUserMutation = useMutation({
     mutationFn: (data: UserFormData) => apiRequest("POST", "/api/users", data),
@@ -294,6 +321,9 @@ export default function Users() {
     setSelectedUser(user);
     editForm.reset({
       username: user.username,
+      firstName: user.firstName || '',
+      lastName: user.lastName || '',
+      email: user.email || '',
       role: user.role as "admin" | "user" | "reporter",
       authType: user.authType as "local" | "ldap",
       isActive: user.isActive,
@@ -422,7 +452,13 @@ export default function Users() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="local">Local</SelectItem>
-                              <SelectItem value="ldap">LDAP</SelectItem>
+                              <SelectItem 
+                                value="ldap" 
+                                disabled={!isLdapEnabled}
+                                className={!isLdapEnabled ? "opacity-50 cursor-not-allowed" : ""}
+                              >
+                                LDAP {!isLdapEnabled && "(Disabled)"}
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -585,84 +621,123 @@ export default function Users() {
         </div>
       </div>
 
-      <div className="grid gap-4">
-        {userList.map((user: SystemUser) => (
-          <Card key={user.id}>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div>
-                    <CardTitle className="text-lg">{user.username}</CardTitle>
-                    <CardDescription className="flex items-center gap-2">
-                      <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                        {user.role}
-                      </Badge>
-                      <Badge variant="outline">{user.authType}</Badge>
-                      <Badge variant={user.isActive ? "default" : "secondary"}>
-                        {user.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </CardDescription>
-                  </div>
-                </div>
+      {/* Search and Filter Controls */}
+      <div className="flex gap-4 items-center">
+        <div className="flex-1">
+          <Input
+            placeholder="Search users by username, name, or email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="max-w-md"
+          />
+        </div>
+        <div className="min-w-[200px]">
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="user">User</SelectItem>
+              <SelectItem value="reporter">Reporter</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="border rounded-lg">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Username</TableHead>
+              <TableHead>Full Name</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Auth Type</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Created</TableHead>
+              {isAdmin && <TableHead>Actions</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {userList.map((user: SystemUser) => (
+              <TableRow key={user.id}>
+                <TableCell className="font-medium">{user.username}</TableCell>
+                <TableCell>
+                  {user.firstName || user.lastName 
+                    ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                    : '-'
+                  }
+                </TableCell>
+                <TableCell>{user.email || '-'}</TableCell>
+                <TableCell>
+                  <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                    {user.role}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">{user.authType}</Badge>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={user.isActive ? "default" : "secondary"} className={user.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
+                    {user.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm text-muted-foreground">
+                  {new Date(user.createdAt).toLocaleDateString()}
+                </TableCell>
                 {isAdmin && (
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(user)}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    {user.authType === "local" && (
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowAdminPasswordDialog(true);
-                        }}
+                        onClick={() => handleEdit(user)}
                       >
-                        <Lock className="h-4 w-4" />
+                        <Edit className="h-4 w-4" />
                       </Button>
-                    )}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <Trash2 className="h-4 w-4" />
+                      {user.authType === "local" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setShowAdminPasswordDialog(true);
+                          }}
+                        >
+                          <Lock className="h-4 w-4" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the user
-                            account for "{user.username}".
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDelete(user.id)}>
-                            Delete
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+                      )}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This action cannot be undone. This will permanently delete the user
+                              account for "{user.username}".
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => handleDelete(user.id)}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </TableCell>
                 )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm text-muted-foreground space-y-1">
-                <div>
-                  <strong>Last Login:</strong> {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "Never"}
-                </div>
-                <div>
-                  <strong>Created:</strong> {new Date(user.createdAt).toLocaleString()}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
 
       {/* Edit User Dialog */}
@@ -684,6 +759,45 @@ export default function Users() {
                     <FormLabel>Username</FormLabel>
                     <FormControl>
                       <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="firstName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>First Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="lastName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Last Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -725,10 +839,38 @@ export default function Users() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="local">Local</SelectItem>
-                        <SelectItem value="ldap">LDAP</SelectItem>
+                        <SelectItem 
+                          value="ldap" 
+                          disabled={!isLdapEnabled}
+                          className={!isLdapEnabled ? "opacity-50 cursor-not-allowed" : ""}
+                        >
+                          LDAP {!isLdapEnabled && "(Disabled)"}
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel>Active Status</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        Enable or disable this user account
+                      </div>
+                    </div>
+                    <FormControl>
+                      <input
+                        type="checkbox"
+                        checked={field.value}
+                        onChange={field.onChange}
+                        className="h-4 w-4"
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />

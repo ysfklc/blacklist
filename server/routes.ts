@@ -116,6 +116,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(users.map(user => ({
         id: user.id,
         username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
         role: user.role,
         authType: user.authType,
         isActive: user.isActive,
@@ -238,6 +241,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         id: user.id,
         username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
         role: user.role,
         authType: user.authType,
         isActive: user.isActive,
@@ -332,7 +338,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard/stats", authenticateToken, async (req, res) => {
     try {
       const stats = await storage.getDashboardStats();
-      res.json(stats);
+      
+      // Filter recent activity based on user role
+      let filteredRecentActivity = stats.recentActivity;
+      if (req.user.role === "user") {
+        // Users only see fetch and blocked activities
+        filteredRecentActivity = stats.recentActivity.filter((activity: any) => 
+          activity.action === 'fetch' || 
+          activity.action === 'block' || 
+          activity.details.toLowerCase().includes('fetch') || 
+          activity.details.toLowerCase().includes('block')
+        );
+      } else if (req.user.role === "reporter") {
+        // Reporters see no recent activity
+        filteredRecentActivity = [];
+      }
+      
+      res.json({
+        ...stats,
+        recentActivity: filteredRecentActivity
+      });
     } catch (error) {
       console.error("Dashboard stats error:", error);
       res.status(500).json({ error: "Internal server error" });
@@ -812,7 +837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Audit logs routes
-  app.get("/api/audit-logs", authenticateToken, requireRole(["admin", "user"]), async (req, res) => {
+  app.get("/api/audit-logs", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
       const { page = 1, limit = 50, level, action, user, startDate, endDate } = req.query;
       const filters = {
@@ -833,7 +858,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/audit-logs/export", authenticateToken, requireRole(["admin", "user"]), async (req, res) => {
+  app.get("/api/audit-logs/export", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
       const { level, action, user, startDate, endDate } = req.query;
       const filters = {

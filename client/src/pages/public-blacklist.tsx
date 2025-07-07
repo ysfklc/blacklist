@@ -142,7 +142,7 @@ export default function PublicBlacklist() {
                     {safeFileList.map((filename: string) => (
                       <a
                         key={filename}
-                        href={`/blacklist/${type}/${filename}`}
+                        href={`/public/blacklist/${type}/${filename}`}
                         download
                         className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors group"
                       >

@@ -2,19 +2,25 @@ import fs from "fs/promises";
 import path from "path";
 import { storage } from "./storage";
 
-const MAX_LINES_PER_FILE = 100000;
 const BLACKLIST_DIR = path.join(process.cwd(), "public", "blacklist");
 
 export async function generateBlacklistFiles(): Promise<void> {
   try {
+    // Get max file size from settings
+    const settings = await storage.getSettings();
+    const maxFileSizeSetting = settings.find(s => s.key === "system.maxFileSize");
+    const maxLinesPerFile = maxFileSizeSetting ? parseInt(maxFileSizeSetting.value) : 100000;
+    
+    console.log(`[BLACKLIST] Max lines per file setting: ${maxLinesPerFile} (from value: ${maxFileSizeSetting?.value})`);
+
     // Ensure directories exist
     await ensureDirectories();
 
     // Generate files for each indicator type
-    await generateIPFiles();
-    await generateDomainFiles();
-    await generateHashFiles();
-    await generateURLFiles();
+    await generateIPFiles(maxLinesPerFile);
+    await generateDomainFiles(maxLinesPerFile);
+    await generateHashFiles(maxLinesPerFile);
+    await generateURLFiles(maxLinesPerFile);
 
     console.log("Blacklist files generated successfully");
   } catch (error) {
@@ -32,12 +38,12 @@ async function ensureDirectories(): Promise<void> {
   }
 }
 
-async function generateIPFiles(): Promise<void> {
+async function generateIPFiles(maxLinesPerFile: number): Promise<void> {
   const indicators = await storage.getActiveIndicatorsByType("ip");
-  await writeIndicatorsToFiles(indicators, "IP", "BlackIP");
+  await writeIndicatorsToFiles(indicators, "IP", "BlackIP", maxLinesPerFile);
 }
 
-async function generateDomainFiles(): Promise<void> {
+async function generateDomainFiles(maxLinesPerFile: number): Promise<void> {
   const indicators = await storage.getActiveIndicatorsByType("domain");
   
   // Expand domains to include wildcard versions
@@ -50,24 +56,26 @@ async function generateDomainFiles(): Promise<void> {
   await writeIndicatorsToFiles(
     expandedDomains.map(value => ({ value })),
     "Domain",
-    "BlackDomain"
+    "BlackDomain",
+    maxLinesPerFile
   );
 }
 
-async function generateHashFiles(): Promise<void> {
+async function generateHashFiles(maxLinesPerFile: number): Promise<void> {
   const indicators = await storage.getActiveIndicatorsByType("hash");
-  await writeIndicatorsToFiles(indicators, "Hash", "BlackHash");
+  await writeIndicatorsToFiles(indicators, "Hash", "BlackHash", maxLinesPerFile);
 }
 
-async function generateURLFiles(): Promise<void> {
+async function generateURLFiles(maxLinesPerFile: number): Promise<void> {
   const indicators = await storage.getActiveIndicatorsByType("url");
-  await writeIndicatorsToFiles(indicators, "URL", "BlackURL");
+  await writeIndicatorsToFiles(indicators, "URL", "BlackURL", maxLinesPerFile);
 }
 
 async function writeIndicatorsToFiles(
   indicators: { value: string }[],
   type: string,
-  prefix: string
+  prefix: string,
+  maxLinesPerFile: number
 ): Promise<void> {
   const dir = path.join(BLACKLIST_DIR, type);
   
@@ -93,7 +101,7 @@ async function writeIndicatorsToFiles(
   for (const indicator of indicators) {
     currentFile.push(indicator.value);
     
-    if (currentFile.length >= MAX_LINES_PER_FILE) {
+    if (currentFile.length >= maxLinesPerFile) {
       await writeFile(dir, `${prefix}${fileIndex}.txt`, currentFile);
       currentFile = [];
       fileIndex++;

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Database, ToggleRight, Clock, Network } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface DashboardStats {
   totalIndicators: number;
@@ -31,9 +32,13 @@ interface DashboardStats {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
+
+  const canViewRecentActivity = user?.role !== "reporter";
+  const isUserRole = user?.role === "user";
 
   if (isLoading) {
     return (
@@ -127,7 +132,7 @@ export default function Dashboard() {
         </div>
 
         {/* Charts and Recent Activity */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className={`grid gap-6 mb-8 ${canViewRecentActivity ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
           {/* Indicator Types Chart */}
           <Card>
             <CardHeader>
@@ -175,49 +180,64 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
-          {/* Recent Activity */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {stats.recentActivity.length === 0 ? (
-                <p className="text-gray-500 text-sm">No recent activity</p>
-              ) : (
-                <div className="flow-root max-h-96 overflow-y-auto">
-                  <ul role="list" className="-mb-8">
-                    {stats.recentActivity.map((activity, index) => (
-                      <li key={activity.id}>
-                        <div className={`relative ${index !== stats.recentActivity.length - 1 ? 'pb-8' : ''}`}>
-                          {index !== stats.recentActivity.length - 1 && (
-                            <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"></span>
-                          )}
-                          <div className="relative flex space-x-3">
-                            <div>
-                              <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
-                                activity.level === 'error' ? 'bg-red-500' :
-                                activity.level === 'warning' ? 'bg-yellow-500' : 'bg-green-500'
-                              }`}>
-                                <span className="h-2 w-2 bg-white rounded-full"></span>
-                              </span>
-                            </div>
-                            <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-sm text-gray-500 break-words">{activity.details}</p>
+          {/* Recent Activity - Only show for non-reporter roles */}
+          {canViewRecentActivity && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.recentActivity.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No recent activity</p>
+                ) : (
+                  <div className="flow-root max-h-96 overflow-y-auto">
+                    <ul role="list" className="-mb-8">
+                      {(() => {
+                        const filteredActivities = stats.recentActivity.filter((activity) => {
+                          // For users, only show fetch and blocked activities
+                          if (isUserRole) {
+                            return activity.action === 'fetch' || activity.action === 'block' || 
+                                   activity.details.toLowerCase().includes('fetch') || 
+                                   activity.details.toLowerCase().includes('block');
+                          }
+                          // For admins, show all activities
+                          return true;
+                        });
+                        
+                        return filteredActivities.map((activity, index) => (
+                          <li key={activity.id}>
+                            <div className={`relative ${index !== filteredActivities.length - 1 ? 'pb-8' : ''}`}>
+                              {index !== filteredActivities.length - 1 && (
+                                <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"></span>
+                              )}
+                              <div className="relative flex space-x-3">
+                                <div>
+                                  <span className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${
+                                    activity.level === 'error' ? 'bg-red-500' :
+                                    activity.level === 'warning' ? 'bg-yellow-500' : 'bg-green-500'
+                                  }`}>
+                                    <span className="h-2 w-2 bg-white rounded-full"></span>
+                                  </span>
+                                </div>
+                                <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm text-gray-500 break-words">{activity.details}</p>
+                                  </div>
+                                  <div className="text-right text-sm whitespace-nowrap text-gray-500 flex-shrink-0">
+                                    <time>{new Date(activity.createdAt).toLocaleTimeString()}</time>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="text-right text-sm whitespace-nowrap text-gray-500 flex-shrink-0">
-                                <time>{new Date(activity.createdAt).toLocaleTimeString()}</time>
-                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                          </li>
+                        ));
+                      })()}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Data Sources Status */}

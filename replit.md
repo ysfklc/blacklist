@@ -4,7 +4,26 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
-- **2025-07-06**: Successfully migrated from Replit Agent to Replit environment
+- **2025-07-07**: Made LDAP option conditional in Create/Edit User forms
+  - LDAP authentication type appears disabled and unselectable when LDAP is not active
+  - Visual indicator shows "(Disabled)" when LDAP is turned off in settings
+- **2025-07-07**: Added "Trust All Certificates" checkbox to LDAP/Active Directory Configuration
+  - Allows LDAP connections to ignore SSL/TLS certificate errors when enabled
+  - Useful for self-signed certificates or internal CA certificates
+- **2025-07-07**: Implemented role-based access controls for Audit Logs section
+  - User role: Cannot access Audit Logs section (removed from sidebar and API access)
+  - Admin role: Full access to Audit Logs as before
+- **2025-07-07**: Implemented role-based access controls for Recent Activity section
+  - Reporter role: Cannot see Recent Activity tab at all
+  - User role: Only sees fetch and blocked activities in Recent Activity
+  - Admin role: Sees all activities as before
+- **2025-07-07**: Enhanced Users page with table format including search and role filtering
+- **2025-07-07**: Fixed API endpoints to return firstName, lastName, and email fields for users
+- **2025-07-07**: Added green background color for Active status badges
+- **2025-07-07**: Made "Max Indicators per File" setting dynamic - blacklist files now update automatically when this value is changed
+- **2025-07-07**: Changed blacklist update interval from minutes to seconds in settings page with configurable scheduler
+- **2025-07-07**: Fixed blacklist download links to include proper /public/ path prefix
+- **2025-07-07**: Successfully migrated from Replit Agent to Replit environment
 - **2025-07-06**: Fixed database schema compatibility issue with dashboard stats API  
 - **2025-07-06**: Set up PostgreSQL database with complete schema migration
 - **2025-07-06**: Configured authentication system with admin user (username: admin, password: test123)
