@@ -4,6 +4,8 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-07**: Updated Public Blacklist Feeds page logo to use RSS feed icon for better representation of data feeds functionality
+- **2025-07-07**: Converted main application logo from PNG to SVG format for improved scalability and performance
 - **2025-07-07**: Added proxy settings section to enable HTTP/HTTPS requests through corporate proxy servers
   - Added toggle to enable/disable proxy functionality
   - Added fields for proxy host, port, username, and password configuration
