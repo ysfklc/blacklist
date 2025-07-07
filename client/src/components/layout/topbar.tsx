@@ -77,18 +77,8 @@ export default function Topbar() {
             <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
-          <div className="flex items-center space-x-2">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              <span className="h-1.5 w-1.5 bg-green-400 rounded-full mr-1"></span>
-              System Online
-            </span>
-          </div>
-          <button className="text-gray-400 hover:text-gray-500 relative">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">
-              0
-            </span>
-          </button>
+          
+          
         </div>
       </div>
     </div>

@@ -4,6 +4,11 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-07**: Implemented user avatars using initials from first/last names with consistent color generation
+  - Created UserAvatar component that generates initials from firstName/lastName or username
+  - Added color-coded backgrounds based on user identifiers for consistency
+  - Integrated avatars in sidebar user display and users table
+  - Avatars support multiple sizes (sm, md, lg) with proper responsive design
 - **2025-07-07**: Made LDAP option conditional in Create/Edit User forms
   - LDAP authentication type appears disabled and unselectable when LDAP is not active
   - Visual indicator shows "(Disabled)" when LDAP is turned off in settings

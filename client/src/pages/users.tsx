@@ -17,6 +17,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 interface SystemUser {
   id: number;
@@ -650,7 +651,7 @@ export default function Users() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Username</TableHead>
+              <TableHead>User</TableHead>
               <TableHead>Full Name</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
@@ -663,7 +664,12 @@ export default function Users() {
           <TableBody>
             {userList.map((user: SystemUser) => (
               <TableRow key={user.id}>
-                <TableCell className="font-medium">{user.username}</TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center space-x-3">
+                    <UserAvatar user={user} size="sm" />
+                    <span>{user.username}</span>
+                  </div>
+                </TableCell>
                 <TableCell>
                   {user.firstName || user.lastName 
                     ? `${user.firstName || ''} ${user.lastName || ''}`.trim()

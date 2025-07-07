@@ -5,6 +5,7 @@ import { Database, List, CheckCircle, Link2, FileText, Settings, User, LogOut, U
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { DashboardIcon } from "@/components/ui/dashboard-icon";
+import { UserAvatar } from "@/components/ui/user-avatar";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: DashboardIcon, roles: ["admin", "user", "reporter"] },
@@ -38,7 +39,7 @@ export default function Sidebar() {
         <div className="flex items-center">
           <Logo size="sm" />
           {!isCollapsed && (
-            <span className="ml-3 text-white text-lg font-semibold">Threat Intel</span>
+            <span className="ml-3 text-white text-lg font-semibold">The Blacklist</span>
           )}
         </div>
         <button
@@ -92,8 +93,8 @@ export default function Sidebar() {
           {!isCollapsed ? (
             <>
               <div className="flex items-center">
-                <div className="h-8 w-8 bg-gray-600 rounded-full flex items-center justify-center mr-2">
-                  <User className="h-4 w-4" />
+                <div className="mr-2">
+                  <UserAvatar user={user} size="sm" />
                 </div>
                 <div>
                   <p className="font-medium">{user?.username}</p>
@@ -109,8 +110,8 @@ export default function Sidebar() {
             </>
           ) : (
             <>
-              <div className="h-8 w-8 bg-gray-600 rounded-full flex items-center justify-center group relative">
-                <User className="h-4 w-4" />
+              <div className="group relative">
+                <UserAvatar user={user} size="sm" />
                 <div className="absolute left-full ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
                   {user?.username} ({user?.role})
                 </div>

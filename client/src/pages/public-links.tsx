@@ -370,7 +370,7 @@ export default function PublicLinks() {
               <h3 className="text-sm font-medium text-blue-800">File Format Information</h3>
               <div className="mt-2 text-sm text-blue-700">
                 <ul className="list-disc list-inside space-y-1">
-                  <li>Each file contains a maximum of 100,000 lines</li>
+                  <li>Each file contains a maximum of 100,000 lines (default)</li>
                   <li>Domain entries include both domain.com and *.domain.com formats</li>
                   <li>Files are updated automatically based on fetch intervals</li>
                   <li>All files are in plain text format (.txt)</li>

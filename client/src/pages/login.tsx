@@ -46,7 +46,7 @@ export default function Login() {
           <div className="mx-auto mb-4 flex justify-center">
             <Logo size="lg" />
           </div>
-          <h2 className="mt-6 text-3xl font-bold text-white">Threat Intel Platform</h2>
+          <h2 className="mt-6 text-3xl font-bold text-white">The Blacklist</h2>
           <p className="mt-2 text-sm text-gray-300">Sign in to your account</p>
         </div>
 
@@ -114,7 +114,7 @@ export default function Login() {
                 Go to Public Blacklist
               </Button>
             </Link>
-            <p className="text-gray-400 text-xs mt-2">Access threat intelligence data without login</p>
+            <p className="text-gray-400 text-xs mt-2">Access blacklist data without login</p>
           </div>
         </div>
       </div>
