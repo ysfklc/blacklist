@@ -38,6 +38,14 @@ export default function Settings() {
     blacklistUpdateInterval: 300,
   });
 
+  const [proxySettings, setProxySettings] = useState({
+    enabled: false,
+    host: "",
+    port: 8080,
+    username: "",
+    password: "",
+  });
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -70,6 +78,15 @@ export default function Settings() {
         maxFileSize: parseInt(settingsMap["system.maxFileSize"] || "100000"),
         logRetention: parseInt(settingsMap["system.logRetention"] || "90"),
         blacklistUpdateInterval: parseInt(settingsMap["system.blacklistUpdateInterval"] || "300"),
+      });
+
+      // Update proxy settings
+      setProxySettings({
+        enabled: settingsMap["proxy.enabled"] === "true",
+        host: settingsMap["proxy.host"] || "",
+        port: parseInt(settingsMap["proxy.port"] || "8080"),
+        username: settingsMap["proxy.username"] || "",
+        password: settingsMap["proxy.password"] || "",
       });
     }
   }, [settings]);
@@ -118,6 +135,30 @@ export default function Settings() {
       toast({
         title: "Error",
         description: "Failed to save system settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveProxyMutation = useMutation({
+    mutationFn: () => apiRequest("PUT", "/api/settings", {
+      "proxy.enabled": proxySettings.enabled.toString(),
+      "proxy.host": proxySettings.host,
+      "proxy.port": proxySettings.port.toString(),
+      "proxy.username": proxySettings.username,
+      "proxy.password": proxySettings.password,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({
+        title: "Success",
+        description: "Proxy settings saved successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save proxy settings",
         variant: "destructive",
       });
     },
@@ -320,6 +361,85 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Proxy Configuration */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Proxy Configuration</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={(e) => { e.preventDefault(); saveProxyMutation.mutate(); }} className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="proxy-enabled"
+                    checked={proxySettings.enabled}
+                    onCheckedChange={(checked) => setProxySettings({ ...proxySettings, enabled: !!checked })}
+                  />
+                  <Label htmlFor="proxy-enabled">Enable Proxy for All HTTP/HTTPS Requests</Label>
+                </div>
+                <p className="text-sm text-gray-600">
+                  Enable this option if your environment requires all internet traffic to go through a proxy server.
+                </p>
+              </div>
+              
+              {proxySettings.enabled && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                  <div>
+                    <Label htmlFor="proxy-host">Proxy Host</Label>
+                    <Input
+                      id="proxy-host"
+                      placeholder="proxy.company.com"
+                      value={proxySettings.host}
+                      onChange={(e) => setProxySettings({ ...proxySettings, host: e.target.value })}
+                      required={proxySettings.enabled}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="proxy-port">Proxy Port</Label>
+                    <Input
+                      id="proxy-port"
+                      type="number"
+                      placeholder="8080"
+                      value={proxySettings.port}
+                      onChange={(e) => setProxySettings({ ...proxySettings, port: parseInt(e.target.value) || 8080 })}
+                      required={proxySettings.enabled}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="proxy-username">Proxy Username (Optional)</Label>
+                    <Input
+                      id="proxy-username"
+                      placeholder="username"
+                      value={proxySettings.username}
+                      onChange={(e) => setProxySettings({ ...proxySettings, username: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="proxy-password">Proxy Password (Optional)</Label>
+                    <Input
+                      id="proxy-password"
+                      type="password"
+                      placeholder="password"
+                      value={proxySettings.password}
+                      onChange={(e) => setProxySettings({ ...proxySettings, password: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={saveProxyMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Proxy Settings
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
 
       </div>
     </main>
