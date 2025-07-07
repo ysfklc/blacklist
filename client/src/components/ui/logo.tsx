@@ -20,7 +20,7 @@ export function Logo({ className, size = "md" }: LogoProps) {
     )}>
       <svg 
         viewBox="0 0 512 512" 
-        className="w-full h-full text-white"
+        className="w-full h-full text-gray-900"
         fill="currentColor"
       >
         {/* Blacklist prohibition symbol */}
