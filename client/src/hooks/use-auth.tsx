@@ -4,6 +4,9 @@ import { apiRequest } from "@/lib/queryClient";
 interface User {
   id: number;
   username: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
   role: string;
   authType: string;
 }

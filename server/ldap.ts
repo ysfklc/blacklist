@@ -194,12 +194,26 @@ export class LdapService {
               return attr ? (attr.values || attr.vals)[0] : '';
             };
 
+            // Extract name components
+            let firstName = getAttr('givenName');
+            let lastName = getAttr('sn');
+            const cn = getAttr('cn') || getAttr('displayName');
+            
+            // If firstName or lastName is empty, try to parse from cn
+            if ((!firstName || !lastName) && cn) {
+              const nameParts = cn.split(' ');
+              if (nameParts.length >= 2) {
+                if (!firstName) firstName = nameParts[0];
+                if (!lastName) lastName = nameParts.slice(1).join(' ');
+              }
+            }
+
             const user: LdapUser = {
               username: getAttr('sAMAccountName') || getAttr('uid') || getAttr('userPrincipalName') || getAttr('cn'),
-              firstName: getAttr('givenName'),
-              lastName: getAttr('sn'),
+              firstName: firstName || '',
+              lastName: lastName || '',
               email: getAttr('mail'),
-              cn: getAttr('cn') || getAttr('displayName')
+              cn: cn
             };
 
             console.log(`[LDAP] Parsed user: ${JSON.stringify(user)}`);

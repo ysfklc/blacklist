@@ -27,6 +27,8 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, count, sql, inArray } from "drizzle-orm";
+import * as fs from 'fs';
+import * as path from 'path';
 import CIDR from "ip-cidr";
 import { encrypt, decrypt, shouldEncrypt } from "./encryption";
 
@@ -840,29 +842,45 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPublicFileStats(): Promise<any> {
+    
     const [ipCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'ip'), eq(indicators.isActive, true)));
     const [domainCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'domain'), eq(indicators.isActive, true)));
     const [hashCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'hash'), eq(indicators.isActive, true)));
     const [urlCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'url'), eq(indicators.isActive, true)));
 
+    // Count actual files in each directory
+    const countFiles = (directory: string) => {
+      try {
+        const dirPath = path.join('./public/blacklist', directory);
+        if (fs.existsSync(dirPath)) {
+          const files = fs.readdirSync(dirPath).filter((file: string) => file.endsWith('.txt'));
+          return files.length;
+        }
+        return 0;
+      } catch (error) {
+        console.error(`Error counting files in ${directory}:`, error);
+        return 0;
+      }
+    };
+
     return {
       ip: {
-        count: Math.ceil(ipCount.count / 100000),
+        count: countFiles('IP'),
         totalCount: ipCount.count.toLocaleString(),
         lastUpdate: "2 min ago",
       },
       domain: {
-        count: Math.ceil(domainCount.count / 100000),
+        count: countFiles('Domain'),
         totalCount: domainCount.count.toLocaleString(),
         lastUpdate: "2 min ago",
       },
       hash: {
-        count: Math.ceil(hashCount.count / 100000),
+        count: countFiles('Hash'),
         totalCount: hashCount.count.toLocaleString(),
         lastUpdate: "2 min ago",
       },
       url: {
-        count: Math.ceil(urlCount.count / 100000),
+        count: countFiles('URL'),
         totalCount: urlCount.count.toLocaleString(),
         lastUpdate: "2 min ago",
       },

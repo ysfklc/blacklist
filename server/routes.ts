@@ -117,6 +117,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         id: user.id,
         username: user.username,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        email: user.email,
         role: user.role,
         authType: user.authType,
       });
@@ -986,7 +989,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stats = await storage.getPublicFileStats();
       res.json(stats);
     } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+      console.error("Public file stats error:", error);
+      res.status(500).json({ error: "Internal server error", details: error.message });
     }
   });
 

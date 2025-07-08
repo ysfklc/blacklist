@@ -4,6 +4,19 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-08**: Fixed public blacklist file count display to show actual file count instead of calculated count
+  - Updated getPublicFileStats function to count actual files in filesystem directories
+  - Fixed Domain Blacklists showing "4 files" when 8 files actually existed
+  - Enhanced file counting to use fs.readdirSync for accurate file enumeration
+- **2025-07-08**: Fixed LDAP first name parsing and user avatar initials display
+  - Enhanced LDAP user parsing to split full names from CN field when givenName/sn attributes are empty
+  - Fixed /api/auth/me endpoint to include firstName, lastName, and email fields
+  - Updated User interface in auth hook to support complete user profile data
+  - User avatars now display proper two-letter initials (e.g., "AE" for Albert Einstein)
+- **2025-07-08**: Fixed encryption implementation for LDAP password storage
+  - Corrected crypto API usage from non-existent createCipherGCM to working createCipheriv
+  - Implemented proper AES-256-CBC encryption for sensitive LDAP settings
+  - LDAP configuration can now be saved successfully with encrypted passwords
 - **2025-07-08**: Successfully completed migration from Replit Agent to Replit environment and fixed critical issues
   - **Security Enhancement**: Implemented AES-256-GCM encryption for sensitive settings like LDAP passwords
   - Fixed LDAP authentication and search issues by discovering correct ForumSys server structure
