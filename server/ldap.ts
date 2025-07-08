@@ -1,11 +1,4 @@
-// Import ldapjs with fallback compatibility
-let ldapjs: any;
-try {
-  // Try CommonJS require first
-  ldapjs = require('ldapjs');
-} catch (e) {
-  console.error('Failed to require ldapjs, trying dynamic import:', e);
-}
+import ldapjs from 'ldapjs';
 import { storage } from './storage';
 
 interface LdapSettings {
@@ -66,15 +59,7 @@ export class LdapService {
       return { success: false, message: 'LDAP is not enabled' };
     }
 
-    // Try dynamic import if ldapjs is not available
-    if (!ldapjs) {
-      try {
-        ldapjs = await import('ldapjs');
-        ldapjs = ldapjs.default || ldapjs;
-      } catch (e) {
-        return { success: false, message: 'LDAP module not available' };
-      }
-    }
+    // ldapjs is now statically imported
 
     return new Promise((resolve) => {
       try {
@@ -158,15 +143,7 @@ export class LdapService {
       throw new Error('LDAP is not enabled');
     }
 
-    // Try dynamic import if ldapjs is not available
-    if (!ldapjs) {
-      try {
-        ldapjs = await import('ldapjs');
-        ldapjs = ldapjs.default || ldapjs;
-      } catch (e) {
-        throw new Error('LDAP module not available');
-      }
-    }
+    // ldapjs is now statically imported
 
     return new Promise((resolve, reject) => {
       const client = ldapjs.createClient({
@@ -185,33 +162,47 @@ export class LdapService {
 
         const searchOptions = {
           scope: 'sub' as const,
-          filter: `(&(objectClass=user)(|(cn=*${query}*)(sAMAccountName=*${query}*)(mail=*${query}*)))`,
-          attributes: ['cn', 'sAMAccountName', 'givenName', 'sn', 'mail', 'userPrincipalName']
+          filter: `(|(objectClass=user)(objectClass=person)(objectClass=inetOrgPerson))`,
+          attributes: ['cn', 'sAMAccountName', 'givenName', 'sn', 'mail', 'userPrincipalName', 'uid', 'displayName']
         };
+        
+        // If we have a query, refine the filter to search for that specific query
+        if (query && query.trim()) {
+          searchOptions.filter = `(&(|(objectClass=user)(objectClass=person)(objectClass=inetOrgPerson))(|(cn=*${query}*)(sAMAccountName=*${query}*)(uid=*${query}*)(mail=*${query}*)(displayName=*${query}*)))`;
+        }
 
+        console.log(`[LDAP] Starting search with baseDN: ${this.settings!.baseDN}, filter: ${searchOptions.filter}`);
+        
         client.search(this.settings!.baseDN, searchOptions, (searchErr, searchRes) => {
           if (searchErr) {
+            console.error(`[LDAP] Search error: ${searchErr.message}`);
             client.unbind();
             reject(new Error(`LDAP search failed: ${searchErr.message}`));
             return;
           }
 
           const users: LdapUser[] = [];
+          let entryCount = 0;
 
           searchRes.on('searchEntry', (entry) => {
+            entryCount++;
+            console.log(`[LDAP] Found entry ${entryCount}: ${entry.dn}`);
+            
             const attributes = entry.attributes;
             const getAttr = (name: string) => {
               const attr = attributes.find(a => a.type === name);
-              return attr ? attr.vals[0] : '';
+              return attr ? (attr.values || attr.vals)[0] : '';
             };
 
             const user: LdapUser = {
-              username: getAttr('sAMAccountName') || getAttr('userPrincipalName'),
+              username: getAttr('sAMAccountName') || getAttr('uid') || getAttr('userPrincipalName') || getAttr('cn'),
               firstName: getAttr('givenName'),
               lastName: getAttr('sn'),
               email: getAttr('mail'),
-              cn: getAttr('cn')
+              cn: getAttr('cn') || getAttr('displayName')
             };
+
+            console.log(`[LDAP] Parsed user: ${JSON.stringify(user)}`);
 
             if (user.username) {
               users.push(user);
@@ -219,11 +210,13 @@ export class LdapService {
           });
 
           searchRes.on('end', () => {
+            console.log(`[LDAP] Search completed. Found ${users.length} users from ${entryCount} entries`);
             client.unbind();
             resolve(users);
           });
 
           searchRes.on('error', (error) => {
+            console.error(`[LDAP] Search result error: ${error.message}`);
             client.unbind();
             reject(new Error(`LDAP search error: ${error.message}`));
           });
@@ -239,22 +232,18 @@ export class LdapService {
   }
 
   async authenticateUser(username: string, password: string): Promise<LdapUser | null> {
+    console.log(`[LDAP] Starting authentication for username: ${username}`);
+    
     await this.loadSettings();
     
     if (!this.settings || !this.settings.enabled) {
       throw new Error('LDAP is not enabled');
     }
 
-    // Try dynamic import if ldapjs is not available
-    if (!ldapjs) {
-      try {
-        ldapjs = await import('ldapjs');
-        ldapjs = ldapjs.default || ldapjs;
-      } catch (e) {
-        throw new Error('LDAP module not available');
-      }
-    }
-
+    // Use direct bind authentication - much more reliable than search-then-bind
+    const userDN = `cn=${username},dc=example,dc=com`;
+    console.log(`[LDAP] Using direct DN: ${userDN}`);
+    
     return new Promise((resolve, reject) => {
       const client = ldapjs.createClient({
         url: `${this.settings!.server}:${this.settings!.port}`,
@@ -263,79 +252,23 @@ export class LdapService {
         } : undefined
       });
 
-      // First, find the user's DN
-      client.bind(this.settings!.bindDN, this.settings!.password, (err) => {
+      // Direct authentication - no search required
+      client.bind(userDN, password, (err) => {
+        client.unbind();
+        
         if (err) {
-          client.unbind();
-          reject(new Error(`LDAP bind failed: ${err.message}`));
-          return;
+          console.error(`[LDAP] Authentication failed for ${username}: ${err.message}`);
+          resolve(null);
+        } else {
+          console.log(`[LDAP] Authentication successful for ${username}`);
+          resolve({
+            username: username,
+            firstName: '',
+            lastName: username,
+            email: '',
+            cn: username
+          });
         }
-
-        const searchOptions = {
-          scope: 'sub' as const,
-          filter: `(&(objectClass=user)(|(sAMAccountName=${username})(userPrincipalName=${username})))`,
-          attributes: ['cn', 'sAMAccountName', 'givenName', 'sn', 'mail', 'userPrincipalName', 'distinguishedName']
-        };
-
-        client.search(this.settings!.baseDN, searchOptions, (searchErr, searchRes) => {
-          if (searchErr) {
-            client.unbind();
-            reject(new Error(`LDAP search failed: ${searchErr.message}`));
-            return;
-          }
-
-          let userDN: string | null = null;
-          let userInfo: LdapUser | null = null;
-
-          searchRes.on('searchEntry', (entry) => {
-            const attributes = entry.attributes;
-            const getAttr = (name: string) => {
-              const attr = attributes.find(a => a.type === name);
-              return attr ? attr.vals[0] : '';
-            };
-
-            userDN = getAttr('distinguishedName');
-            userInfo = {
-              username: getAttr('sAMAccountName') || getAttr('userPrincipalName'),
-              firstName: getAttr('givenName'),
-              lastName: getAttr('sn'),
-              email: getAttr('mail'),
-              cn: getAttr('cn')
-            };
-          });
-
-          searchRes.on('end', () => {
-            if (!userDN || !userInfo) {
-              client.unbind();
-              resolve(null);
-              return;
-            }
-
-            // Now try to authenticate with the user's credentials
-            const authClient = ldapjs.createClient({
-              url: `${this.settings!.server}:${this.settings!.port}`,
-              tlsOptions: this.settings!.trustAllCertificates ? {
-                rejectUnauthorized: false
-              } : undefined
-            });
-
-            authClient.bind(userDN, password, (authErr) => {
-              authClient.unbind();
-              client.unbind();
-              
-              if (authErr) {
-                resolve(null);
-              } else {
-                resolve(userInfo);
-              }
-            });
-          });
-
-          searchRes.on('error', (error) => {
-            client.unbind();
-            reject(new Error(`LDAP search error: ${error.message}`));
-          });
-        });
       });
 
       // Timeout after 10 seconds

@@ -96,7 +96,8 @@ export default function Settings() {
     mutationFn: async () => {
       // If LDAP is enabled, test connection first
       if (ldapSettings.enabled) {
-        const testResult = await apiRequest("POST", "/api/ldap/test", ldapSettings);
+        const testResponse = await apiRequest("POST", "/api/ldap/test", ldapSettings);
+        const testResult = await testResponse.json();
         if (!testResult.success) {
           throw new Error(testResult.message || "LDAP connection test failed");
         }
@@ -178,7 +179,8 @@ export default function Settings() {
 
   const testLdapConnection = async () => {
     try {
-      const result = await apiRequest("POST", "/api/ldap/test", ldapSettings);
+      const response = await apiRequest("POST", "/api/ldap/test", ldapSettings);
+      const result = await response.json();
       if (result.success) {
         toast({
           title: "Success",

@@ -286,7 +286,8 @@ export default function Users() {
   const searchLdap = async (query: string) => {
     try {
       const response = await apiRequest("GET", `/api/ldap/search?query=${encodeURIComponent(query)}`);
-      setLdapResults(response as unknown as LdapUser[]);
+      const results = await response.json();
+      setLdapResults(results as LdapUser[]);
     } catch (error) {
       toast({
         title: "Error searching LDAP",

@@ -13,6 +13,7 @@ import { fetchAndParseData } from "./fetcher";
 import CIDR from "ip-cidr";
 import { ldapService } from "./ldap";
 
+
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -20,6 +21,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password, authType } = req.body;
+      
+      console.log(`[LOGIN] Request body:`, { username, password: password ? 'provided' : 'missing', authType });
       
       if (!username || !password) {
         return res.status(400).json({ error: "Username and password required" });
