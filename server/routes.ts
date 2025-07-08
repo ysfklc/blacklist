@@ -18,20 +18,27 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // IP-based access control middleware
 function checkIPAccess(req: any, res: any, next: any) {
-  const clientIP = req.ip || req.connection.remoteAddress;
+  const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  
+  console.log(`[IP ACCESS] Checking access for IP: ${clientIP}`);
+  console.log(`[IP ACCESS] Headers:`, req.headers);
   
   // Get allowed IPs from settings
   storage.getSettings().then(settings => {
     const settingsMap = Object.fromEntries(settings.map(s => [s.key, s.value]));
     const allowedIPs = settingsMap["system.apiDocsAllowedIPs"] || "";
     
+    console.log(`[IP ACCESS] Allowed IPs from settings: "${allowedIPs}"`);
+    
     // If no IPs configured, allow all access
     if (!allowedIPs.trim()) {
+      console.log(`[IP ACCESS] No IPs configured, allowing access`);
       return next();
     }
     
     // Parse allowed IPs (one per line)
     const allowedIPList = allowedIPs.split('\n').map(ip => ip.trim()).filter(ip => ip);
+    console.log(`[IP ACCESS] Parsed allowed IPs:`, allowedIPList);
     
     // Check if client IP is in allowed list
     for (const allowedIP of allowedIPList) {
@@ -40,11 +47,13 @@ function checkIPAccess(req: any, res: any, next: any) {
         if (allowedIP.includes('/')) {
           const cidr = new CIDR(allowedIP);
           if (cidr.contains(clientIP)) {
+            console.log(`[IP ACCESS] CIDR match found: ${clientIP} in ${allowedIP}`);
             return next();
           }
         } else {
           // Direct IP match
           if (clientIP === allowedIP) {
+            console.log(`[IP ACCESS] Direct IP match found: ${clientIP}`);
             return next();
           }
         }
@@ -54,7 +63,8 @@ function checkIPAccess(req: any, res: any, next: any) {
     }
     
     // IP not in allowed list
-    return res.status(403).json({ error: "Access denied from your IP address" });
+    console.log(`[IP ACCESS] Access denied for IP: ${clientIP}`);
+    return res.status(403).json({ error: `Access denied from your IP address: ${clientIP}` });
   }).catch(error => {
     console.error('Error loading settings for IP check:', error);
     return res.status(500).json({ error: "Internal server error" });
@@ -642,8 +652,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/indicators", authenticateTokenOrApiKey, requireRole(["admin", "user"]), async (req, res) => {
     try {
+      const { durationHours, ...bodyData } = req.body;
+      
       const validatedData = insertIndicatorSchema.parse({
-        ...req.body,
+        ...bodyData,
+        source: "manual", // Automatically assign source as manual
         createdBy: req.user.userId,
       });
 
@@ -663,12 +676,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const indicator = await storage.createIndicator(validatedData);
       
+      // If durationHours is provided, set temporary activation
+      if (durationHours && durationHours > 0 && durationHours <= 168) {
+        await storage.tempActivateIndicator(indicator.id, durationHours, req.user.userId);
+      }
+      
       await storage.createAuditLog({
         level: "info",
         action: "create",
         resource: "indicator",
         resourceId: indicator.id.toString(),
-        details: `Created new indicator: ${indicator.value}`,
+        details: `Created new indicator: ${indicator.value}${durationHours ? ` with ${durationHours}h duration` : ''}`,
         userId: req.user.userId,
         ipAddress: req.ip,
       });
@@ -1223,6 +1241,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }
+  });
+
+  // IP information endpoint
+  app.get("/api/my-ip", (req, res) => {
+    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    res.json({ ip: clientIP });
   });
 
   // API documentation access control route

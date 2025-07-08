@@ -37,10 +37,8 @@ export default function ApiTokensPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: { name: string; expiresAt?: string }) => {
-      return apiRequest("/api/tokens", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      const response = await apiRequest("POST", "/api/tokens", data);
+      return await response.json();
     },
     onSuccess: (data) => {
       setCreatedToken(data.token);
@@ -54,10 +52,11 @@ export default function ApiTokensPage() {
         description: "Your new API token has been created successfully.",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Token creation error:", error);
       toast({
         title: "Error",
-        description: "Failed to create API token.",
+        description: error?.message || "Failed to create API token.",
         variant: "destructive",
       });
     },
@@ -65,9 +64,8 @@ export default function ApiTokensPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/tokens/${id}`, {
-        method: "DELETE",
-      });
+      const response = await apiRequest("DELETE", `/api/tokens/${id}`);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tokens"] });
@@ -87,9 +85,8 @@ export default function ApiTokensPage() {
 
   const revokeMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest(`/api/tokens/${id}/revoke`, {
-        method: "PATCH",
-      });
+      const response = await apiRequest("PATCH", `/api/tokens/${id}/revoke`);
+      return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/tokens"] });
@@ -158,7 +155,7 @@ export default function ApiTokensPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">API Tokens</h1>
@@ -223,84 +220,90 @@ export default function ApiTokensPage() {
         ) : (
           tokens.map((token: ApiToken) => (
             <Card key={token.id}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-lg">{token.name}</CardTitle>
-                <div className="flex items-center space-x-2">
-                  {!token.isActive ? (
-                    <Badge variant="destructive">Revoked</Badge>
-                  ) : isExpired(token.expiresAt) ? (
-                    <Badge variant="destructive">Expired</Badge>
-                  ) : (
-                    <Badge variant="default">Active</Badge>
-                  )}
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="sm">
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Delete API Token</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Are you sure you want to delete this API token? This action cannot be undone.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={() => deleteMutation.mutate(token.id)}
-                          disabled={deleteMutation.isPending}
-                        >
-                          Delete
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-4">
+                <div className="space-y-1">
+                  <CardTitle className="text-lg">{token.name}</CardTitle>
+                  <div className="flex items-center space-x-2">
+                    {!token.isActive ? (
+                      <Badge variant="destructive">Revoked</Badge>
+                    ) : isExpired(token.expiresAt) ? (
+                      <Badge variant="destructive">Expired</Badge>
+                    ) : (
+                      <Badge variant="default">Active</Badge>
+                    )}
+                  </div>
                 </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete API Token</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to delete this API token? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => deleteMutation.mutate(token.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Token:</span>
-                    <div className="flex items-center space-x-2">
-                      <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
-                        {token.token}
-                      </code>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Token:</span>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => copyToClipboard(token.token)}
                       >
-                        <Copy className="w-4 h-4" />
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy
                       </Button>
                     </div>
+                    <code className="text-xs font-mono bg-muted px-2 py-1 rounded block break-all">
+                      {token.token.substring(0, 40)}...
+                    </code>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Created:</span>
-                    <span className="text-sm">{formatDate(token.createdAt)}</span>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Created:</span>
+                      <div className="font-medium">{formatDate(token.createdAt)}</div>
+                    </div>
+                    {token.expiresAt && (
+                      <div>
+                        <span className="text-muted-foreground">Expires:</span>
+                        <div className="font-medium">{formatDate(token.expiresAt)}</div>
+                      </div>
+                    )}
+                    {token.lastUsed && (
+                      <div>
+                        <span className="text-muted-foreground">Last Used:</span>
+                        <div className="font-medium">{formatDate(token.lastUsed)}</div>
+                      </div>
+                    )}
                   </div>
-                  {token.expiresAt && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Expires:</span>
-                      <span className="text-sm">{formatDate(token.expiresAt)}</span>
-                    </div>
-                  )}
-                  {token.lastUsed && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Last Used:</span>
-                      <span className="text-sm">{formatDate(token.lastUsed)}</span>
-                    </div>
-                  )}
                   {token.isActive && !isExpired(token.expiresAt) && (
-                    <div className="pt-2">
+                    <div className="pt-4 border-t">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => revokeMutation.mutate(token.id)}
                         disabled={revokeMutation.isPending}
+                        className="text-red-600 hover:text-red-700 border-red-200 hover:bg-red-50"
                       >
-                        Revoke Token
+                        {revokeMutation.isPending ? "Revoking..." : "Revoke Token"}
                       </Button>
                     </div>
                   )}

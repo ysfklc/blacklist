@@ -4,6 +4,20 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-08**: Enhanced API documentation with dynamic domain URLs and improved indicators endpoint
+  - Replaced "https://your-domain.replit.app" with actual application domain in all API documentation examples
+  - Updated POST /api/indicators endpoint to automatically assign source as "manual" (no longer required in request body)
+  - Added durationHours parameter support to POST /api/indicators for temporary indicator activation
+  - Enhanced IP access error messages to show user's actual IP address for easier troubleshooting
+  - Added /api/my-ip endpoint to help users identify their IP address
+  - Updated Python examples to reflect new API structure without source parameter
+- **2025-07-08**: Successfully migrated project from Replit Agent to Replit environment
+  - Created PostgreSQL database with complete schema initialization
+  - Fixed missing Textarea component import in settings page
+  - Fixed API Tokens page UI with improved layout, token display, and responsive design
+  - Fixed API token creation functionality by correcting request format in mutations
+  - Verified application startup and core functionality working
+  - All authentication, database operations, and UI components functioning properly
 - **2025-07-08**: Implemented temporary indicator activation feature
   - Added tempActiveUntil field to indicators database schema
   - Created API endpoint for temporary activation with duration validation (1-168 hours)

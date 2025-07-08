@@ -15,10 +15,19 @@ export default function ApiDocsPage() {
   const [bearerToken, setBearerToken] = useState("");
   const { toast } = useToast();
 
+  // Get user's IP address
+  const { data: ipInfo } = useQuery({
+    queryKey: ["/api/my-ip"],
+    retry: false,
+  });
+
   // Check IP access control
   const { data: ipAccessCheck, isLoading: checkingAccess, error: accessError } = useQuery({
     queryKey: ["/api-docs-access-check"],
-    queryFn: () => apiRequest("/api-docs"),
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api-docs");
+      return await response.json();
+    },
     retry: false,
   });
 
@@ -36,22 +45,34 @@ export default function ApiDocsPage() {
   }
 
   if (accessError) {
+    const errorMessage = accessError.message || "Access denied";
+    const ipAddress = ipInfo?.ip || "Unknown";
+    
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 p-6">
         <div className="flex items-center justify-center min-h-[400px]">
-          <Card className="w-full max-w-md">
+          <Card className="w-full max-w-lg">
             <CardHeader>
               <CardTitle className="flex items-center text-destructive">
                 <Lock className="w-5 h-5 mr-2" />
                 Access Denied
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-4">
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
                 Your IP address is not authorized to access the API documentation.
               </p>
+              <div className="bg-muted p-3 rounded-lg">
+                <p className="text-sm font-medium">Your IP Address:</p>
+                <code className="text-sm font-mono">{ipAddress}</code>
+              </div>
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <strong>To fix this:</strong> Go to Settings → API Documentation Access Control and add your IP address ({ipAddress}) to the allowed list.
+                </p>
+              </div>
               <p className="text-sm text-muted-foreground">
-                Please contact your administrator to add your IP address to the allowed list in Settings.
+                Error details: {errorMessage}
               </p>
             </CardContent>
           </Card>
@@ -83,17 +104,17 @@ export default function ApiDocsPage() {
       ],
       roles: ["admin", "user", "reporter"],
       example: `curl -H "Authorization: Bearer ${bearerToken}" \\
-  "https://your-domain.replit.app/api/indicators?page=1&limit=10&type=ip"`
+  "${window.location.origin}/api/indicators?page=1&limit=10&type=ip"`
     },
     {
       method: "POST",
       path: "/api/indicators",
-      description: "Create a new threat indicator",
+      description: "Create a new threat indicator (user is automatically assigned from API token)",
       body: {
         value: "192.168.1.100",
         type: "ip",
-        source: "manual",
-        notes: "Suspicious IP address detected"
+        notes: "Suspicious IP address detected",
+        durationHours: 24
       },
       roles: ["admin", "user"],
       example: `curl -X POST \\
@@ -102,10 +123,10 @@ export default function ApiDocsPage() {
   -d '{
     "value": "192.168.1.100",
     "type": "ip",
-    "source": "manual",
-    "notes": "Suspicious IP address detected"
+    "notes": "Suspicious IP address detected",
+    "durationHours": 24
   }' \\
-  "https://your-domain.replit.app/api/indicators"`
+  "${window.location.origin}/api/indicators"`
     },
     {
       method: "PUT",
@@ -123,7 +144,7 @@ export default function ApiDocsPage() {
     "isActive": false,
     "notes": "Updated notes"
   }' \\
-  "https://your-domain.replit.app/api/indicators/123"`
+  "${window.location.origin}/api/indicators/123"`
     },
     {
       method: "POST",
@@ -139,7 +160,7 @@ export default function ApiDocsPage() {
   -d '{
     "durationHours": 24
   }' \\
-  "https://your-domain.replit.app/api/indicators/123/temp-activate"`
+  "${window.location.origin}/api/indicators/123/temp-activate"`
     },
     {
       method: "POST",
@@ -155,7 +176,7 @@ export default function ApiDocsPage() {
   -d '{
     "content": "This indicator was confirmed as malicious"
   }' \\
-  "https://your-domain.replit.app/api/indicators/123/notes"`
+  "${window.location.origin}/api/indicators/123/notes"`
     },
     {
       method: "GET",
@@ -163,12 +184,12 @@ export default function ApiDocsPage() {
       description: "Get all notes for an indicator",
       roles: ["admin", "user", "reporter"],
       example: `curl -H "Authorization: Bearer ${bearerToken}" \\
-  "https://your-domain.replit.app/api/indicators/123/notes"`
+  "${window.location.origin}/api/indicators/123/notes"`
     }
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       <div>
         <h1 className="text-3xl font-bold">API Documentation</h1>
         <p className="text-muted-foreground">
@@ -324,7 +345,7 @@ export default function ApiDocsPage() {
                   <code>{`import requests
 
 # Configuration
-API_BASE_URL = "https://your-domain.replit.app"
+API_BASE_URL = "${window.location.origin}"
 API_TOKEN = "${bearerToken || 'your-api-token-here'}"
 
 headers = {
@@ -336,12 +357,12 @@ headers = {
 response = requests.get(f"{API_BASE_URL}/api/indicators", headers=headers)
 indicators = response.json()
 
-# Create a new indicator
+# Create a new indicator (source is automatically assigned)
 new_indicator = {
     "value": "malicious-domain.com",
-    "type": "domain", 
-    "source": "threat_feed",
-    "notes": "Reported by security team"
+    "type": "domain",
+    "notes": "Reported by security team",
+    "durationHours": 24
 }
 
 response = requests.post(

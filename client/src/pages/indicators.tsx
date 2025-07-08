@@ -128,10 +128,7 @@ export default function Indicators() {
 
   const createMutation = useMutation({
     mutationFn: (data: IndicatorFormData) => 
-      apiRequest("POST", "/api/indicators", {
-        ...data,
-        source: "manual"
-      }),
+      apiRequest("POST", "/api/indicators", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/indicators"] });
       setIsAddModalOpen(false);
