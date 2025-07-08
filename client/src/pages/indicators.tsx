@@ -508,6 +508,7 @@ export default function Indicators() {
                   <TableHead>Type</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Temp Active Until</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -516,7 +517,7 @@ export default function Indicators() {
               <TableBody>
                 {indicators?.data?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={canDelete ? 8 : 7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={canDelete ? 9 : 8} className="text-center text-muted-foreground py-8">
                       No indicators found
                     </TableCell>
                   </TableRow>
@@ -550,6 +551,18 @@ export default function Indicators() {
                             {indicator.isActive ? "Active" : "Passive"}
                           </span>
                         </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {indicator.tempActiveUntil ? (
+                          <div className="flex flex-col">
+                            <span>{new Date(indicator.tempActiveUntil).toLocaleDateString()}</span>
+                            <span className="text-xs opacity-70">
+                              {new Date(indicator.tempActiveUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground/50">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(indicator.createdAt).toLocaleDateString()}

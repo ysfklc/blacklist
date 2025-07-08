@@ -4,6 +4,16 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-08**: Added temp_active_until column visibility to indicators table UI
+  - Added "Temp Active Until" column header to indicators table
+  - Displays formatted date and time when temporary activation is set
+  - Shows dash (—) when no temporary activation is set
+  - Enhanced table layout to accommodate new column
+- **2025-07-08**: Successfully completed migration from Replit Agent to Replit environment
+  - Set up PostgreSQL database with complete schema initialization
+  - Fixed missing tsx package dependency for TypeScript execution
+  - Verified all core functionality working properly
+  - Application running cleanly on port 5000 with proper authentication
 - **2025-07-08**: Implemented unique indicator validation to prevent duplicate entries
   - Added unique database constraint on indicator values to enforce uniqueness at database level
   - Implemented API-level duplicate checking with detailed error messages (409 Conflict status)
