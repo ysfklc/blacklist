@@ -26,7 +26,7 @@ import {
   type InsertIndicatorNote
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, ilike, desc, count, sql, inArray } from "drizzle-orm";
+import { eq, and, or, ilike, desc, count, sql, inArray, isNotNull } from "drizzle-orm";
 import * as fs from 'fs';
 import * as path from 'path';
 import CIDR from "ip-cidr";
@@ -63,6 +63,8 @@ export interface IStorage {
   bulkCreateOrUpdateIndicators(indicators: Partial<InsertIndicator>[]): Promise<number>;
   updateIndicator(id: number, data: Partial<Indicator>): Promise<Indicator>;
   deleteIndicator(id: number): Promise<void>;
+  tempActivateIndicator(id: number, durationHours: number, userId: number): Promise<Indicator>;
+  deactivateExpiredTempIndicators(): Promise<number>;
   isWhitelisted(value: string, type: string): Promise<boolean>;
   bulkCheckWhitelist(values: string[], type: string): Promise<Set<string>>;
   getDistinctIndicatorSources(): Promise<any[]>;
@@ -335,6 +337,7 @@ export class DatabaseStorage implements IStorage {
         sourceId: indicators.sourceId,
         isActive: indicators.isActive,
         notes: indicators.notes,
+        tempActiveUntil: indicators.tempActiveUntil,
         createdAt: indicators.createdAt,
         updatedAt: indicators.updatedAt,
         createdBy: indicators.createdBy,
@@ -569,6 +572,73 @@ export class DatabaseStorage implements IStorage {
 
   async deleteIndicator(id: number): Promise<void> {
     await db.delete(indicators).where(eq(indicators.id, id));
+  }
+
+  async tempActivateIndicator(id: number, durationHours: number, userId: number): Promise<Indicator> {
+    const expirationTime = new Date();
+    expirationTime.setHours(expirationTime.getHours() + durationHours);
+    
+    const [updated] = await db
+      .update(indicators)
+      .set({ 
+        isActive: true, 
+        tempActiveUntil: expirationTime,
+        updatedAt: new Date()
+      })
+      .where(eq(indicators.id, id))
+      .returning();
+    
+    // Create audit log
+    await this.createAuditLog({
+      level: 'info',
+      action: 'temp_activate',
+      resource: 'indicator',
+      resourceId: id.toString(),
+      details: `Temporarily activated indicator for ${durationHours} hours until ${expirationTime.toISOString()}`,
+      userId: userId
+    });
+    
+    return updated;
+  }
+
+  async deactivateExpiredTempIndicators(): Promise<number> {
+    const now = new Date();
+    
+    try {
+      // Update expired indicators in a single query
+      const result = await db
+        .update(indicators)
+        .set({ 
+          isActive: false, 
+          tempActiveUntil: null,
+          updatedAt: new Date()
+        })
+        .where(
+          and(
+            eq(indicators.isActive, true),
+            isNotNull(indicators.tempActiveUntil),
+            sql`${indicators.tempActiveUntil} <= ${now}`
+          )
+        )
+        .returning({ id: indicators.id });
+      
+      // Create audit logs for each deactivated indicator
+      for (const indicator of result) {
+        await this.createAuditLog({
+          level: 'info',
+          action: 'temp_deactivate',
+          resource: 'indicator',
+          resourceId: indicator.id.toString(),
+          details: `Automatically deactivated expired temporary indicator`,
+          userId: 1 // System user
+        });
+      }
+      
+      return result.length;
+    } catch (error) {
+      console.error('Error deactivating expired temp indicators:', error);
+      return 0;
+    }
   }
 
   async isWhitelisted(value: string, type: string): Promise<boolean> {

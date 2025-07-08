@@ -4,6 +4,14 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-08**: Implemented temporary indicator activation feature
+  - Added tempActiveUntil field to indicators database schema
+  - Created API endpoint for temporary activation with duration validation (1-168 hours)
+  - Built TempActivateDialog component with preset and custom duration options
+  - Added Clock button to indicators table for inactive indicators (admin/user roles only)
+  - Implemented automatic deactivation scheduler that runs every minute
+  - Added temporary activation status display in indicator details modal
+  - Enhanced audit logging for temporary activation events
 - **2025-07-08**: Fixed public blacklist file count display to show actual file count instead of calculated count
   - Updated getPublicFileStats function to count actual files in filesystem directories
   - Fixed Domain Blacklists showing "4 files" when 8 files actually existed

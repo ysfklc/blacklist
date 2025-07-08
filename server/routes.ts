@@ -679,6 +679,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Temporary activation route
+  app.post("/api/indicators/:id/temp-activate", authenticateToken, requireRole(["admin", "user"]), async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { durationHours } = req.body;
+      
+      if (!durationHours || durationHours <= 0 || durationHours > 168) { // Max 1 week
+        return res.status(400).json({ error: "Duration must be between 1 and 168 hours" });
+      }
+      
+      const indicator = await storage.tempActivateIndicator(id, durationHours, req.user.userId);
+      res.json(indicator);
+    } catch (error) {
+      console.error('Error in temporary activation:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Indicator notes routes
   app.get("/api/indicators/:id/notes", authenticateToken, async (req, res) => {
     try {

@@ -41,6 +41,7 @@ export const indicators = pgTable("indicators", {
   sourceId: integer("source_id").references(() => dataSources.id),
   isActive: boolean("is_active").notNull().default(true),
   notes: text("notes"),
+  tempActiveUntil: timestamp("temp_active_until"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   createdBy: integer("created_by").references(() => users.id),

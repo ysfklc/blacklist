@@ -35,6 +35,18 @@ export function initializeScheduler() {
     }
   });
 
+  // Check for expired temporary indicators every minute
+  cron.schedule("* * * * *", async () => {
+    try {
+      const deactivatedCount = await storage.deactivateExpiredTempIndicators();
+      if (deactivatedCount > 0) {
+        console.log(`[SCHEDULER] Deactivated ${deactivatedCount} expired temporary indicators`);
+      }
+    } catch (error) {
+      console.error("Error in temporary indicator deactivation scheduler:", error);
+    }
+  });
+
   // Check for blacklist generation every 10 seconds (configurable interval)
   cron.schedule("*/10 * * * * *", async () => {
     try {

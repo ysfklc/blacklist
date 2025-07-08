@@ -12,6 +12,7 @@ interface Indicator {
   isActive: boolean;
   notes: string | null;
   notesCount?: number;
+  tempActiveUntil?: string | null;
   createdAt: string;
   createdByUser?: string;
 }
@@ -62,9 +63,16 @@ export default function IndicatorDetailsModal({
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Status</label>
-                <Badge variant={indicator.isActive ? "default" : "secondary"}>
-                  {indicator.isActive ? "Active" : "Inactive"}
-                </Badge>
+                <div className="flex flex-col space-y-1">
+                  <Badge variant={indicator.isActive ? "default" : "secondary"}>
+                    {indicator.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  {indicator.tempActiveUntil && indicator.isActive && (
+                    <Badge variant="outline" className="bg-yellow-50 border-yellow-200 text-yellow-800">
+                      Temporary until {formatDistanceToNow(new Date(indicator.tempActiveUntil))} from now
+                    </Badge>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-600">Created</label>

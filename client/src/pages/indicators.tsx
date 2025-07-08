@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Eye, MessageSquare } from "lucide-react";
+import { Plus, Trash2, Eye, MessageSquare, Clock } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import IndicatorDetailsModal from "@/components/indicator-details-modal";
+import TempActivateDialog from "@/components/temp-activate-dialog";
 
 const indicatorSchema = z.object({
   value: z.string().min(1, "Value is required"),
@@ -34,6 +35,7 @@ interface Indicator {
   isActive: boolean;
   notes: string | null;
   notesCount?: number;
+  tempActiveUntil?: string | null;
   createdAt: string;
   createdByUser?: string;
 }
@@ -44,6 +46,8 @@ export default function Indicators() {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedIndicators, setSelectedIndicators] = useState<number[]>([]);
   const [selectAll, setSelectAll] = useState(false);
+  const [tempActivateIndicatorId, setTempActivateIndicatorId] = useState<number | null>(null);
+  const [isTempActivateDialogOpen, setIsTempActivateDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
     type: "all",
     status: "all",
@@ -200,6 +204,11 @@ export default function Indicators() {
     if (confirm("Are you sure you want to delete this indicator?")) {
       deleteMutation.mutate(id);
     }
+  };
+
+  const handleTempActivate = (id: number) => {
+    setTempActivateIndicatorId(id);
+    setIsTempActivateDialogOpen(true);
   };
 
   // Multi-select handlers
@@ -603,6 +612,16 @@ export default function Indicators() {
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
+                          {(user?.role === "admin" || user?.role === "user") && indicator.isActive && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleTempActivate(indicator.id)}
+                              title="Extend activation period"
+                            >
+                              <Clock className="h-4 w-4" />
+                            </Button>
+                          )}
                           {canDelete && (
                             <Button
                               variant="ghost"
@@ -776,6 +795,16 @@ export default function Indicators() {
         onClose={() => {
           setIsDetailsModalOpen(false);
           setSelectedIndicator(null);
+        }}
+      />
+
+      {/* Temporary Activation Dialog */}
+      <TempActivateDialog
+        indicatorId={tempActivateIndicatorId}
+        isOpen={isTempActivateDialogOpen}
+        onClose={() => {
+          setIsTempActivateDialogOpen(false);
+          setTempActivateIndicatorId(null);
         }}
       />
     </main>
