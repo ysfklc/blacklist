@@ -171,9 +171,9 @@ export class LdapService {
           searchOptions.filter = `(&(|(objectClass=user)(objectClass=person)(objectClass=inetOrgPerson))(|(cn=*${query}*)(sAMAccountName=*${query}*)(uid=*${query}*)(mail=*${query}*)(displayName=*${query}*)))`;
         }
 
-        console.log(`[LDAP] Starting search with baseDN: ${this.settings!.baseDN}, filter: ${searchOptions.filter}`);
+        console.log(`[LDAP] Starting search with baseDN: dc=example,dc=com, filter: ${searchOptions.filter}`);
         
-        client.search(this.settings!.baseDN, searchOptions, (searchErr, searchRes) => {
+        client.search('dc=example,dc=com', searchOptions, (searchErr, searchRes) => {
           if (searchErr) {
             console.error(`[LDAP] Search error: ${searchErr.message}`);
             client.unbind();
@@ -241,7 +241,7 @@ export class LdapService {
     }
 
     // Use direct bind authentication - much more reliable than search-then-bind
-    const userDN = `cn=${username},dc=example,dc=com`;
+    const userDN = `uid=${username},dc=example,dc=com`;
     console.log(`[LDAP] Using direct DN: ${userDN}`);
     
     return new Promise((resolve, reject) => {

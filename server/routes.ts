@@ -933,6 +933,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/settings", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
+      console.log('Settings update request:', req.body);
       await storage.updateSettings(req.body, req.user.userId);
       
       await storage.createAuditLog({
@@ -946,7 +947,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ message: "Settings updated" });
     } catch (error) {
-      res.status(500).json({ error: "Internal server error" });
+      console.error('Settings update error:', error);
+      res.status(500).json({ error: "Internal server error", details: error.message });
     }
   });
 

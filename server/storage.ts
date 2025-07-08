@@ -6,6 +6,7 @@ import {
   whitelistBlocks,
   auditLogs, 
   settings,
+  sessions,
   indicatorNotes,
   type User, 
   type InsertUser,
@@ -27,6 +28,7 @@ import {
 import { db } from "./db";
 import { eq, and, or, ilike, desc, count, sql, inArray } from "drizzle-orm";
 import CIDR from "ip-cidr";
+import { encrypt, decrypt, shouldEncrypt } from "./encryption";
 
 export interface IStorage {
   // User operations
@@ -133,6 +135,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: number): Promise<void> {
+    // First, update all foreign key references to null or handle them appropriately
+    // Update indicators created by this user to null
+    await db.update(indicators)
+      .set({ createdBy: null })
+      .where(eq(indicators.createdBy, id));
+    
+    // Update data sources created by this user to null
+    await db.update(dataSources)
+      .set({ createdBy: null })
+      .where(eq(dataSources.createdBy, id));
+    
+    // Update whitelist entries created by this user to null
+    await db.update(whitelist)
+      .set({ createdBy: null })
+      .where(eq(whitelist.createdBy, id));
+    
+    // Delete indicator notes created by this user
+    await db.delete(indicatorNotes)
+      .where(eq(indicatorNotes.userId, id));
+    
+    // Delete audit logs for this user
+    await db.delete(auditLogs)
+      .where(eq(auditLogs.userId, id));
+    
+    // Delete sessions for this user
+    await db.delete(sessions)
+      .where(eq(sessions.userId, id));
+    
+    // Finally, delete the user
     await db.delete(users).where(eq(users.id, id));
   }
 
@@ -760,38 +791,50 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSettings(): Promise<Setting[]> {
-    return await db.select().from(settings);
+    const allSettings = await db.select().from(settings);
+    
+    // Decrypt sensitive values before returning
+    return allSettings.map(setting => ({
+      ...setting,
+      value: setting.encrypted ? decrypt(setting.value) : setting.value
+    }));
   }
 
   async updateSettings(settingsData: Record<string, any>, userId: number): Promise<void> {
     for (const [key, value] of Object.entries(settingsData)) {
-      const existing = await db
-        .select()
-        .from(settings)
-        .where(eq(settings.key, key))
-        .limit(1);
+      try {
+        const existing = await db
+          .select()
+          .from(settings)
+          .where(eq(settings.key, key))
+          .limit(1);
 
-      const isEncrypted = key.includes('password') || key.includes('secret');
+        const isEncrypted = shouldEncrypt(key);
+        const valueToStore = isEncrypted ? encrypt(String(value)) : String(value);
 
-      if (existing.length > 0) {
-        await db
-          .update(settings)
-          .set({
-            value: String(value),
-            encrypted: isEncrypted,
-            updatedAt: new Date(),
-            updatedBy: userId,
-          })
-          .where(eq(settings.key, key));
-      } else {
-        await db
-          .insert(settings)
-          .values({
-            key,
-            value: String(value),
-            encrypted: isEncrypted,
-            updatedBy: userId,
-          });
+        if (existing.length > 0) {
+          await db
+            .update(settings)
+            .set({
+              value: valueToStore,
+              encrypted: isEncrypted,
+              updatedAt: new Date(),
+              updatedBy: userId,
+            })
+            .where(eq(settings.key, key));
+        } else {
+          await db
+            .insert(settings)
+            .values({
+              key,
+              value: valueToStore,
+              encrypted: isEncrypted,
+              updatedBy: userId,
+            });
+        }
+      } catch (error) {
+        console.error(`Failed to update setting ${key}:`, error);
+        throw error;
       }
     }
   }
