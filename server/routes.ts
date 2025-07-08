@@ -13,6 +13,170 @@ import { fetchAndParseData } from "./fetcher";
 import CIDR from "ip-cidr";
 import { ldapService } from "./ldap";
 
+// Enhanced indicator type detection patterns
+const IP_REGEX = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+const DOMAIN_REGEX = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+const HASH_REGEX = /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$|^[a-fA-F0-9]{56}$|^[a-fA-F0-9]{64}$|^[a-fA-F0-9]{96}$|^[a-fA-F0-9]{128}$/;
+const URL_REGEX = /^https?:\/\/(?:(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}|(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)|localhost)(?::\d{1,5})?(?:\/[^\s<>"{}|\\^`[\]]*)?$/;
+
+// Additional validation patterns
+const RESERVED_IP_RANGES = [
+  /^0\./, // Current network
+  /^10\./, // Private class A
+  /^127\./, // Loopback
+  /^169\.254\./, // Link-local
+  /^172\.(1[6-9]|2[0-9]|3[01])\./, // Private class B
+  /^192\.168\./, // Private class C
+  /^224\./, // Multicast
+  /^240\./, // Reserved
+];
+
+const INVALID_DOMAINS = [
+  /^localhost$/i,
+  /\.localhost$/i,
+  /^.*\.local$/i,
+  /^.*\.internal$/i,
+  /^.*\.test$/i,
+  /^.*\.example$/i,
+  /^.*\.invalid$/i,
+];
+
+const INVALID_URLS = [
+  /^https?:\/\/localhost/i,
+  /^https?:\/\/127\.0\.0\.1/i,
+  /^https?:\/\/10\./i,
+  /^https?:\/\/192\.168\./i,
+  /^https?:\/\/172\.(1[6-9]|2[0-9]|3[01])\./i,
+];
+
+function detectIndicatorType(value: string): { type: string; hashType?: string; error?: string } | null {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+  
+  const trimmedValue = value.trim();
+  
+  // Basic format validation
+  if (trimmedValue.length === 0) {
+    return null;
+  }
+  
+  if (trimmedValue.length > 2048) {
+    return { type: 'error', error: 'Indicator value is too long (maximum 2048 characters)' };
+  }
+  
+  // Check for IP address
+  if (IP_REGEX.test(trimmedValue)) {
+    // Validate IP is not in reserved ranges
+    for (const reservedRange of RESERVED_IP_RANGES) {
+      if (reservedRange.test(trimmedValue)) {
+        return { type: 'error', error: `IP address ${trimmedValue} is in a reserved/private range and cannot be used as a threat indicator` };
+      }
+    }
+    
+    // Check for invalid IP addresses
+    if (trimmedValue === '0.0.0.0' || trimmedValue === '255.255.255.255') {
+      return { type: 'error', error: `IP address ${trimmedValue} is not a valid threat indicator` };
+    }
+    
+    return { type: 'ip' };
+  }
+  
+  // Check for URL
+  if (URL_REGEX.test(trimmedValue)) {
+    // Validate URL is not localhost or private
+    for (const invalidUrl of INVALID_URLS) {
+      if (invalidUrl.test(trimmedValue)) {
+        return { type: 'error', error: `URL ${trimmedValue} points to localhost or private network and cannot be used as a threat indicator` };
+      }
+    }
+    
+    // Additional URL validation
+    try {
+      const url = new URL(trimmedValue);
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+        return { type: 'error', error: 'URL must use HTTP or HTTPS protocol' };
+      }
+    } catch (e) {
+      return { type: 'error', error: 'Invalid URL format' };
+    }
+    
+    return { type: 'url' };
+  }
+  
+  // Check for hash
+  if (HASH_REGEX.test(trimmedValue)) {
+    const hashType = detectHashType(trimmedValue);
+    if (hashType === 'unknown') {
+      return { type: 'error', error: `Hash length ${trimmedValue.length} is not supported. Supported hash types: MD5 (32), SHA1 (40), SHA224 (56), SHA256 (64), SHA384 (96), SHA512 (128)` };
+    }
+    
+    // Validate hash contains only valid hex characters
+    if (!/^[a-fA-F0-9]+$/.test(trimmedValue)) {
+      return { type: 'error', error: 'Hash must contain only hexadecimal characters (0-9, A-F)' };
+    }
+    
+    return { type: 'hash', hashType };
+  }
+  
+  // Check for domain (must be last as it's most permissive)
+  if (DOMAIN_REGEX.test(trimmedValue)) {
+    // Validate domain is not localhost or invalid TLD
+    for (const invalidDomain of INVALID_DOMAINS) {
+      if (invalidDomain.test(trimmedValue)) {
+        return { type: 'error', error: `Domain ${trimmedValue} is localhost or uses an invalid TLD and cannot be used as a threat indicator` };
+      }
+    }
+    
+    // Check for minimum domain requirements
+    if (trimmedValue.length < 4) {
+      return { type: 'error', error: 'Domain is too short to be valid' };
+    }
+    
+    // Check for valid domain structure
+    const parts = trimmedValue.split('.');
+    if (parts.length < 2) {
+      return { type: 'error', error: 'Domain must have at least one dot (e.g., example.com)' };
+    }
+    
+    // Check TLD length
+    const tld = parts[parts.length - 1];
+    if (tld.length < 2 || tld.length > 63) {
+      return { type: 'error', error: 'Domain TLD must be between 2 and 63 characters' };
+    }
+    
+    return { type: 'domain' };
+  }
+  
+  return null;
+}
+
+function detectHashType(hash: string): string {
+  if (!hash) return "unknown";
+  
+  // Validate hash contains only hexadecimal characters
+  if (!/^[a-fA-F0-9]+$/.test(hash)) {
+    return "unknown";
+  }
+  
+  switch (hash.length) {
+    case 32:
+      return "md5";
+    case 40:
+      return "sha1";
+    case 56:
+      return "sha224";
+    case 64:
+      return "sha256";
+    case 96:
+      return "sha384";
+    case 128:
+      return "sha512";
+    default:
+      return "unknown";
+  }
+}
+
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -652,10 +816,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/indicators", authenticateTokenOrApiKey, requireRole(["admin", "user"]), async (req, res) => {
     try {
-      const { durationHours, ...bodyData } = req.body;
+      const { durationHours, value, ...bodyData } = req.body;
+      
+      // Validate input
+      if (!value || typeof value !== 'string') {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: "Indicator value is required and must be a string" 
+        });
+      }
+      
+      // Automatically detect and validate the indicator type
+      const detectedType = detectIndicatorType(value);
+      if (!detectedType) {
+        return res.status(400).json({ 
+          error: "Invalid indicator value", 
+          details: "The provided value does not match any recognized indicator pattern (IP, domain, hash, or URL)" 
+        });
+      }
+      
+      // Check if validation returned an error
+      if (detectedType.type === 'error') {
+        return res.status(400).json({ 
+          error: "Invalid indicator value", 
+          details: detectedType.error 
+        });
+      }
+      
+      // Additional validation for durationHours if provided
+      if (durationHours !== undefined) {
+        if (typeof durationHours !== 'number' || durationHours <= 0 || durationHours > 168) {
+          return res.status(400).json({ 
+            error: "Invalid duration", 
+            details: "Duration must be a number between 1 and 168 hours" 
+          });
+        }
+      }
+      
+      const trimmedValue = value.trim();
+
+      // Check for duplicate indicators
+      // For hashes and domains, use case-insensitive comparison; for others, use case-sensitive
+      const existingIndicator = (detectedType.type === 'hash' || detectedType.type === 'domain') 
+        ? await storage.getIndicatorByValueCaseInsensitive(trimmedValue)
+        : await storage.getIndicatorByValue(trimmedValue);
+        
+      if (existingIndicator) {
+        return res.status(409).json({ 
+          error: "Duplicate indicator", 
+          details: `Indicator with value "${trimmedValue}" already exists (ID: ${existingIndicator.id})`,
+          existingIndicator: {
+            id: existingIndicator.id,
+            value: existingIndicator.value,
+            type: existingIndicator.type,
+            isActive: existingIndicator.isActive,
+            createdAt: existingIndicator.createdAt
+          }
+        });
+      }
+
+      // Normalize hash and domain values to lowercase for consistency
+      const normalizedValue = (detectedType.type === 'hash' || detectedType.type === 'domain') 
+        ? trimmedValue.toLowerCase() 
+        : trimmedValue;
       
       const validatedData = insertIndicatorSchema.parse({
         ...bodyData,
+        value: normalizedValue,
+        type: detectedType.type,
+        hashType: detectedType.hashType,
         source: "manual", // Automatically assign source as manual
         createdBy: req.user.userId,
       });
@@ -686,7 +915,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "create",
         resource: "indicator",
         resourceId: indicator.id.toString(),
-        details: `Created new indicator: ${indicator.value}${durationHours ? ` with ${durationHours}h duration` : ''}`,
+        details: `Created new indicator: ${indicator.value} (${detectedType.type})${durationHours ? ` with ${durationHours}h duration` : ''}`,
         userId: req.user.userId,
         ipAddress: req.ip,
       });
@@ -696,6 +925,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid data", details: error.errors });
       }
+      
+      // Handle database constraint violations
+      if (error && typeof error === 'object' && 'code' in error) {
+        if (error.code === '23505') { // PostgreSQL unique constraint violation
+          return res.status(409).json({ 
+            error: "Duplicate indicator", 
+            details: "An indicator with this value already exists" 
+          });
+        }
+      }
+      
+      console.error("Error creating indicator:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

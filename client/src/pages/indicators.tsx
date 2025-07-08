@@ -21,7 +21,6 @@ import TempActivateDialog from "@/components/temp-activate-dialog";
 
 const indicatorSchema = z.object({
   value: z.string().min(1, "Value is required"),
-  type: z.enum(["ip", "domain", "hash", "url"]),
   notes: z.string().optional(),
 });
 
@@ -121,7 +120,6 @@ export default function Indicators() {
     resolver: zodResolver(indicatorSchema),
     defaultValues: {
       value: "",
-      type: "ip",
       notes: "",
     },
   });
@@ -327,32 +325,12 @@ export default function Indicators() {
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add Indicator</DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Enter the indicator value below. The type will be automatically detected.
+                    </p>
                   </DialogHeader>
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                      <FormField
-                        control={form.control}
-                        name="type"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Type</FormLabel>
-                            <Select value={field.value} onValueChange={field.onChange}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="ip">IP Address</SelectItem>
-                                <SelectItem value="domain">Domain</SelectItem>
-                                <SelectItem value="hash">Hash</SelectItem>
-                                <SelectItem value="url">URL</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
                       <FormField
                         control={form.control}
                         name="value"
@@ -360,7 +338,7 @@ export default function Indicators() {
                           <FormItem>
                             <FormLabel>Value</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter indicator value" {...field} />
+                              <Input placeholder="Enter IP, domain, hash, or URL" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

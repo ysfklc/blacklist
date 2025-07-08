@@ -109,10 +109,9 @@ export default function ApiDocsPage() {
     {
       method: "POST",
       path: "/api/indicators",
-      description: "Create a new threat indicator (user is automatically assigned from API token)",
+      description: "Create a new threat indicator (type is automatically detected from value)",
       body: {
         value: "192.168.1.100",
-        type: "ip",
         notes: "Suspicious IP address detected",
         durationHours: 24
       },
@@ -122,7 +121,6 @@ export default function ApiDocsPage() {
   -H "Content-Type: application/json" \\
   -d '{
     "value": "192.168.1.100",
-    "type": "ip",
     "notes": "Suspicious IP address detected",
     "durationHours": 24
   }' \\
@@ -357,10 +355,9 @@ headers = {
 response = requests.get(f"{API_BASE_URL}/api/indicators", headers=headers)
 indicators = response.json()
 
-# Create a new indicator (source is automatically assigned)
+# Create a new indicator (type is automatically detected)
 new_indicator = {
     "value": "malicious-domain.com",
-    "type": "domain",
     "notes": "Reported by security team",
     "durationHours": 24
 }
@@ -390,11 +387,9 @@ headers = {
 response = requests.get(f"{API_BASE_URL}/api/indicators", headers=headers)
 indicators = response.json()
 
-# Create a new indicator
+# Create a new indicator (type is automatically detected)
 new_indicator = {
     "value": "malicious-domain.com",
-    "type": "domain", 
-    "source": "threat_feed",
     "notes": "Reported by security team"
 }
 
@@ -442,11 +437,9 @@ async function createIndicator(indicator) {
     return await response.json();
 }
 
-// Usage
+// Usage (type is automatically detected)
 const newIndicator = {
     value: "192.168.1.100",
-    type: "ip",
-    source: "security_scan",
     notes: "Detected in network scan"
 };
 
@@ -483,11 +476,9 @@ async function createIndicator(indicator) {
     return await response.json();
 }
 
-// Usage
+// Usage (type is automatically detected)
 const newIndicator = {
     value: "192.168.1.100",
-    type: "ip",
-    source: "security_scan",
     notes: "Detected in network scan"
 };
 

@@ -4,6 +4,30 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-08**: Implemented unique indicator validation to prevent duplicate entries
+  - Added unique database constraint on indicator values to enforce uniqueness at database level
+  - Implemented API-level duplicate checking with detailed error messages (409 Conflict status)
+  - Added case-insensitive duplicate detection for hashes and domains (DNS is case-insensitive)
+  - Normalized hash and domain values to lowercase for storage consistency
+  - Enhanced error handling for PostgreSQL unique constraint violations (error code 23505)
+  - Returns existing indicator details when duplicates are detected for better user experience
+  - Case-sensitive validation maintained for IPs and URLs where case matters
+- **2025-07-08**: Enhanced API indicator validation with comprehensive security checks and error handling
+  - Added validation for private/reserved IP ranges (10.x.x.x, 192.168.x.x, 172.16-31.x.x, 127.x.x.x, etc.)
+  - Enhanced domain validation to reject localhost, .local, .test, .example, and other invalid TLDs
+  - Improved URL validation to detect and reject localhost, private networks, and invalid protocols
+  - Added comprehensive hash validation supporting MD5, SHA1, SHA224, SHA256, SHA384, SHA512 formats
+  - Enhanced error messages with specific validation failure reasons for better debugging
+  - Added input validation for request parameters (string type checks, length limits, duration validation)
+  - Improved regex patterns for more accurate indicator type detection
+  - All validation now prevents security risks from private/internal network indicators
+- **2025-07-08**: Implemented automatic indicator type detection for API endpoint
+  - POST /api/indicators now automatically detects IP, domain, hash, or URL types from the value
+  - Removed requirement to specify indicator type in API requests
+  - Added comprehensive validation that rejects invalid indicator values with 400 status
+  - Updated API documentation examples to reflect automatic type detection
+  - Modified frontend form to remove type selection and show automatic detection message
+  - Enhanced error handling with descriptive messages for invalid indicator patterns
 - **2025-07-08**: Enhanced API documentation with dynamic domain URLs and improved indicators endpoint
   - Replaced "https://your-domain.replit.app" with actual application domain in all API documentation examples
   - Updated POST /api/indicators endpoint to automatically assign source as "manual" (no longer required in request body)

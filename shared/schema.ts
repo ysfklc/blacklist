@@ -34,7 +34,7 @@ export const dataSources = pgTable("data_sources", {
 
 export const indicators = pgTable("indicators", {
   id: serial("id").primaryKey(),
-  value: text("value").notNull(),
+  value: text("value").notNull().unique(),
   type: text("type").notNull(), // ip, domain, hash, url
   hashType: text("hash_type"), // md5, sha1, sha256, sha512 (for hash type only)
   source: text("source").notNull(),
