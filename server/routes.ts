@@ -11,6 +11,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fetchAndParseData } from "./fetcher";
 import CIDR from "ip-cidr";
+import { ldapService } from "./ldap";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
@@ -34,11 +35,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Invalid authentication type" });
       }
 
-      // For LDAP users, we would normally authenticate against LDAP server
-      // For now, we'll use local password validation
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ error: "Invalid credentials" });
+      // For LDAP users, authenticate against LDAP server
+      if (user.authType === 'ldap') {
+        try {
+          const ldapUser = await ldapService.authenticateUser(username, password);
+          if (!ldapUser) {
+            return res.status(401).json({ error: "Invalid credentials" });
+          }
+        } catch (error) {
+          console.error('LDAP authentication error:', error);
+          return res.status(401).json({ error: "Authentication failed" });
+        }
+      } else {
+        // For local users, use password validation
+        const validPassword = await bcrypt.compare(password, user.password);
+        if (!validPassword) {
+          return res.status(401).json({ error: "Invalid credentials" });
+        }
       }
 
       // Update last login
@@ -305,32 +318,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Search query is required" });
       }
 
-      // Mock LDAP search results for demonstration
-      // In a real implementation, you would connect to your LDAP server here
-      const mockResults = [
-        {
-          username: `${query}.doe`,
-          firstName: "John",
-          lastName: "Doe",
-          email: `${query}.doe@company.com`,
-          cn: `${query} Doe`,
-        },
-        {
-          username: `${query}.smith`,
-          firstName: "Jane",
-          lastName: "Smith", 
-          email: `${query}.smith@company.com`,
-          cn: `${query} Smith`,
-        }
-      ].filter(user => 
-        user.username.toLowerCase().includes(query.toLowerCase()) ||
-        user.firstName.toLowerCase().includes(query.toLowerCase()) ||
-        user.lastName.toLowerCase().includes(query.toLowerCase())
-      );
-
-      res.json(mockResults);
+      try {
+        const users = await ldapService.searchUsers(query);
+        res.json(users);
+      } catch (error) {
+        console.error('LDAP search error:', error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "LDAP search failed" });
+      }
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // LDAP connection test route
+  app.post("/api/ldap/test", authenticateToken, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { server, port, baseDN, bindDN, password, enabled, trustAllCertificates } = req.body;
+      
+      // Create settings object from request body
+      const testSettings = {
+        server: server || '',
+        port: parseInt(port) || 389,
+        baseDN: baseDN || '',
+        bindDN: bindDN || '',
+        password: password || '',
+        enabled: enabled === true || enabled === 'true',
+        trustAllCertificates: trustAllCertificates === true || trustAllCertificates === 'true'
+      };
+      
+      const result = await ldapService.testConnection(testSettings);
+      res.json(result);
+    } catch (error) {
+      console.error('LDAP test connection error:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: error instanceof Error ? error.message : "Connection test failed" 
+      });
     }
   });
 
