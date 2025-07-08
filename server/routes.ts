@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import express from "express";
 import { storage } from "./storage";
-import { authenticateToken, requireRole, hashPassword } from "./auth";
+import { authenticateToken, requireRole, hashPassword, authenticateTokenOrApiKey, type AuthRequest } from "./auth";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { insertUserSchema, insertDataSourceSchema, insertIndicatorSchema, insertWhitelistSchema, insertIndicatorNoteSchema } from "@shared/schema";
@@ -15,6 +15,51 @@ import { ldapService } from "./ldap";
 
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
+
+// IP-based access control middleware
+function checkIPAccess(req: any, res: any, next: any) {
+  const clientIP = req.ip || req.connection.remoteAddress;
+  
+  // Get allowed IPs from settings
+  storage.getSettings().then(settings => {
+    const settingsMap = Object.fromEntries(settings.map(s => [s.key, s.value]));
+    const allowedIPs = settingsMap["system.apiDocsAllowedIPs"] || "";
+    
+    // If no IPs configured, allow all access
+    if (!allowedIPs.trim()) {
+      return next();
+    }
+    
+    // Parse allowed IPs (one per line)
+    const allowedIPList = allowedIPs.split('\n').map(ip => ip.trim()).filter(ip => ip);
+    
+    // Check if client IP is in allowed list
+    for (const allowedIP of allowedIPList) {
+      try {
+        // Check if it's a CIDR range
+        if (allowedIP.includes('/')) {
+          const cidr = new CIDR(allowedIP);
+          if (cidr.contains(clientIP)) {
+            return next();
+          }
+        } else {
+          // Direct IP match
+          if (clientIP === allowedIP) {
+            return next();
+          }
+        }
+      } catch (error) {
+        console.error('Error checking IP:', allowedIP, error);
+      }
+    }
+    
+    // IP not in allowed list
+    return res.status(403).json({ error: "Access denied from your IP address" });
+  }).catch(error => {
+    console.error('Error loading settings for IP check:', error);
+    return res.status(500).json({ error: "Internal server error" });
+  });
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
@@ -563,7 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Indicators routes
-  app.get("/api/indicators", authenticateToken, async (req, res) => {
+  app.get("/api/indicators", authenticateTokenOrApiKey, async (req, res) => {
     try {
       const { page = 1, limit = 50, type, status, source, search } = req.query;
       const filters = {
@@ -595,7 +640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/indicators", authenticateToken, requireRole(["admin", "user"]), async (req, res) => {
+  app.post("/api/indicators", authenticateTokenOrApiKey, requireRole(["admin", "user"]), async (req, res) => {
     try {
       const validatedData = insertIndicatorSchema.parse({
         ...req.body,
@@ -1085,6 +1130,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ error: "Failed to refresh blacklist" });
     }
+  });
+
+  // API token routes
+  app.get("/api/tokens", authenticateToken, async (req, res) => {
+    try {
+      const tokens = await storage.getApiTokens((req as AuthRequest).user.userId);
+      // Remove sensitive token values from response
+      const sanitizedTokens = tokens.map(token => ({
+        ...token,
+        token: token.token.substring(0, 8) + "..." + token.token.substring(token.token.length - 8)
+      }));
+      res.json(sanitizedTokens);
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/tokens", authenticateToken, async (req, res) => {
+    try {
+      const { name, expiresAt } = req.body;
+      if (!name || name.trim() === "") {
+        return res.status(400).json({ error: "Token name is required" });
+      }
+
+      const { generateApiToken } = await import("./auth");
+      const token = generateApiToken();
+      const newToken = await storage.createApiToken({
+        name: name.trim(),
+        token,
+        userId: (req as AuthRequest).user.userId,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        isActive: true
+      });
+
+      // Log the creation
+      await storage.createAuditLog({
+        level: "info",
+        action: "create_api_token",
+        resource: "api_token",
+        resourceId: newToken.id.toString(),
+        details: `Created API token: ${name}`,
+        userId: (req as AuthRequest).user.userId,
+        ipAddress: req.ip || req.connection.remoteAddress
+      });
+
+      res.status(201).json({ ...newToken, token }); // Return full token only on creation
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/tokens/:id", authenticateToken, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteApiToken(id, (req as AuthRequest).user.userId);
+      
+      // Log the deletion
+      await storage.createAuditLog({
+        level: "info",
+        action: "delete_api_token",
+        resource: "api_token",
+        resourceId: id.toString(),
+        details: `Deleted API token`,
+        userId: (req as AuthRequest).user.userId,
+        ipAddress: req.ip || req.connection.remoteAddress
+      });
+
+      res.json({ message: "Token deleted successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/tokens/:id/revoke", authenticateToken, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      await storage.revokeApiToken(id, (req as AuthRequest).user.userId);
+      
+      // Log the revocation
+      await storage.createAuditLog({
+        level: "info",
+        action: "revoke_api_token",
+        resource: "api_token",
+        resourceId: id.toString(),
+        details: `Revoked API token`,
+        userId: (req as AuthRequest).user.userId,
+        ipAddress: req.ip || req.connection.remoteAddress
+      });
+
+      res.json({ message: "Token revoked successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // API documentation access control route
+  app.get("/api-docs", checkIPAccess, (req, res) => {
+    // This route is handled by the frontend routing
+    // The IP check is applied to ensure only allowed IPs can access it
+    res.status(200).json({ message: "API documentation access granted" });
   });
 
   const httpServer = createServer(app);

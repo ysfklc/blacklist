@@ -37,6 +37,7 @@ export default function Settings() {
     maxFileSize: 100000,
     logRetention: 90,
     blacklistUpdateInterval: 300,
+    apiDocsAllowedIPs: "",
   });
 
   const [proxySettings, setProxySettings] = useState({
@@ -79,6 +80,7 @@ export default function Settings() {
         maxFileSize: parseInt(settingsMap["system.maxFileSize"] || "100000"),
         logRetention: parseInt(settingsMap["system.logRetention"] || "90"),
         blacklistUpdateInterval: parseInt(settingsMap["system.blacklistUpdateInterval"] || "300"),
+        apiDocsAllowedIPs: settingsMap["system.apiDocsAllowedIPs"] || "",
       });
 
       // Update proxy settings
@@ -136,6 +138,7 @@ export default function Settings() {
       "system.maxFileSize": systemSettings.maxFileSize.toString(),
       "system.logRetention": systemSettings.logRetention.toString(),
       "system.blacklistUpdateInterval": systemSettings.blacklistUpdateInterval.toString(),
+      "system.apiDocsAllowedIPs": systemSettings.apiDocsAllowedIPs || "",
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
@@ -405,6 +408,35 @@ export default function Settings() {
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save System Settings
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* API Documentation Access Control */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>API Documentation Access Control</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={(e) => { e.preventDefault(); saveSystemMutation.mutate(); }} className="space-y-4">
+              <div className="space-y-3">
+                <Label htmlFor="api-docs-allowed-ips">Allowed IP Addresses for API Documentation</Label>
+                <Textarea
+                  id="api-docs-allowed-ips"
+                  placeholder="Enter IP addresses or CIDR ranges, one per line&#10;Example:&#10;192.168.1.0/24&#10;10.0.0.1&#10;203.0.113.0/24"
+                  value={systemSettings.apiDocsAllowedIPs || ""}
+                  onChange={(e) => setSystemSettings({ ...systemSettings, apiDocsAllowedIPs: e.target.value })}
+                  rows={6}
+                />
+                <p className="text-sm text-gray-600">
+                  Leave empty to allow access from any IP address. Enter IP addresses or CIDR ranges (one per line) to restrict access to the API documentation page.
+                </p>
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" disabled={saveSystemMutation.isPending}>
+                  {saveSystemMutation.isPending ? "Saving..." : "Save Settings"}
                 </Button>
               </div>
             </form>

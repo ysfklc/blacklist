@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { useSidebar } from "@/hooks/use-sidebar";
-import { Database, List, CheckCircle, Link2, FileText, Settings, User, LogOut, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { Database, List, CheckCircle, Link2, FileText, Settings, User, LogOut, Users, ChevronLeft, ChevronRight, Key, Code } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/logo";
 import { DashboardIcon } from "@/components/ui/dashboard-icon";
@@ -13,6 +13,8 @@ const navigation = [
   { name: "Indicators", href: "/indicators", icon: List, roles: ["admin", "user", "reporter"] },
   { name: "Whitelist", href: "/whitelist", icon: CheckCircle, roles: ["admin", "user", "reporter"] },
   { name: "Public Links", href: "/public-links", icon: Link2, roles: ["admin", "user", "reporter"] },
+  { name: "API Tokens", href: "/api-tokens", icon: Key, roles: ["admin", "user"] },
+  { name: "API Docs", href: "/api-docs", icon: Code, roles: ["admin", "user"] },
   { name: "Audit Logs", href: "/audit-logs", icon: FileText, roles: ["admin"] },
   { name: "Users", href: "/users", icon: Users, roles: ["admin", "user", "reporter"] },
   { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },

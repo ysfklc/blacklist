@@ -16,6 +16,8 @@ import PublicBlacklist from "./pages/public-blacklist";
 import AuditLogs from "./pages/audit-logs";
 import Settings from "./pages/settings";
 import Users from "./pages/users";
+import ApiTokens from "./pages/api-tokens";
+import ApiDocs from "./pages/api-docs";
 import NotFound from "@/pages/not-found";
 import Sidebar from "./components/layout/sidebar";
 import Topbar from "./components/layout/topbar";
@@ -91,6 +93,16 @@ function AppContent() {
                 <Route path="/users">
                   <ProtectedRoute allowedRoles={["admin", "user", "reporter"]}>
                     <Users />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/api-tokens">
+                  <ProtectedRoute allowedRoles={["admin", "user"]}>
+                    <ApiTokens />
+                  </ProtectedRoute>
+                </Route>
+                <Route path="/api-docs">
+                  <ProtectedRoute allowedRoles={["admin", "user"]}>
+                    <ApiDocs />
                   </ProtectedRoute>
                 </Route>
                 <Route component={NotFound} />

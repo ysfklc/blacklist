@@ -1,0 +1,361 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Trash2, Plus, Copy, Eye, EyeOff, Calendar } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+
+interface ApiToken {
+  id: number;
+  name: string;
+  token: string;
+  isActive: boolean;
+  lastUsed: string | null;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export default function ApiTokensPage() {
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newTokenName, setNewTokenName] = useState("");
+  const [newTokenExpiry, setNewTokenExpiry] = useState("");
+  const [createdToken, setCreatedToken] = useState<string | null>(null);
+  const [showTokenDialog, setShowTokenDialog] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: tokens = [], isLoading } = useQuery({
+    queryKey: ["/api/tokens"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (data: { name: string; expiresAt?: string }) => {
+      return apiRequest("/api/tokens", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (data) => {
+      setCreatedToken(data.token);
+      setShowTokenDialog(true);
+      setIsCreateDialogOpen(false);
+      setNewTokenName("");
+      setNewTokenExpiry("");
+      queryClient.invalidateQueries({ queryKey: ["/api/tokens"] });
+      toast({
+        title: "API Token Created",
+        description: "Your new API token has been created successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to create API token.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest(`/api/tokens/${id}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tokens"] });
+      toast({
+        title: "Token Deleted",
+        description: "API token has been deleted successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete API token.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest(`/api/tokens/${id}/revoke`, {
+        method: "PATCH",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tokens"] });
+      toast({
+        title: "Token Revoked",
+        description: "API token has been revoked successfully.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to revoke API token.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleCreateToken = () => {
+    if (!newTokenName.trim()) {
+      toast({
+        title: "Error",
+        description: "Token name is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const data: { name: string; expiresAt?: string } = {
+      name: newTokenName.trim(),
+    };
+
+    if (newTokenExpiry) {
+      data.expiresAt = new Date(newTokenExpiry).toISOString();
+    }
+
+    createMutation.mutate(data);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied",
+      description: "Token copied to clipboard.",
+    });
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const isExpired = (expiresAt: string | null) => {
+    if (!expiresAt) return false;
+    return new Date(expiresAt) < new Date();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">API Tokens</h1>
+          <p className="text-muted-foreground">Manage API tokens for programmatic access</p>
+        </div>
+        <div>Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">API Tokens</h1>
+          <p className="text-muted-foreground">
+            Generate and manage API tokens for programmatic access to the threat intelligence platform
+          </p>
+        </div>
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Token
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New API Token</DialogTitle>
+              <DialogDescription>
+                Generate a new API token for programmatic access. Keep it secure as it won't be shown again.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="tokenName">Token Name</Label>
+                <Input
+                  id="tokenName"
+                  value={newTokenName}
+                  onChange={(e) => setNewTokenName(e.target.value)}
+                  placeholder="My API Token"
+                />
+              </div>
+              <div>
+                <Label htmlFor="tokenExpiry">Expiry Date (Optional)</Label>
+                <Input
+                  id="tokenExpiry"
+                  type="datetime-local"
+                  value={newTokenExpiry}
+                  onChange={(e) => setNewTokenExpiry(e.target.value)}
+                />
+              </div>
+              <Button
+                onClick={handleCreateToken}
+                disabled={createMutation.isPending}
+                className="w-full"
+              >
+                {createMutation.isPending ? "Creating..." : "Create Token"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid gap-4">
+        {tokens.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center text-muted-foreground">
+                No API tokens found. Create your first token to get started.
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          tokens.map((token: ApiToken) => (
+            <Card key={token.id}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg">{token.name}</CardTitle>
+                <div className="flex items-center space-x-2">
+                  {!token.isActive ? (
+                    <Badge variant="destructive">Revoked</Badge>
+                  ) : isExpired(token.expiresAt) ? (
+                    <Badge variant="destructive">Expired</Badge>
+                  ) : (
+                    <Badge variant="default">Active</Badge>
+                  )}
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete API Token</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this API token? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteMutation.mutate(token.id)}
+                          disabled={deleteMutation.isPending}
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Token:</span>
+                    <div className="flex items-center space-x-2">
+                      <code className="text-sm font-mono bg-muted px-2 py-1 rounded">
+                        {token.token}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => copyToClipboard(token.token)}
+                      >
+                        <Copy className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Created:</span>
+                    <span className="text-sm">{formatDate(token.createdAt)}</span>
+                  </div>
+                  {token.expiresAt && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Expires:</span>
+                      <span className="text-sm">{formatDate(token.expiresAt)}</span>
+                    </div>
+                  )}
+                  {token.lastUsed && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Last Used:</span>
+                      <span className="text-sm">{formatDate(token.lastUsed)}</span>
+                    </div>
+                  )}
+                  {token.isActive && !isExpired(token.expiresAt) && (
+                    <div className="pt-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => revokeMutation.mutate(token.id)}
+                        disabled={revokeMutation.isPending}
+                      >
+                        Revoke Token
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Token Created Dialog */}
+      <Dialog open={showTokenDialog} onOpenChange={setShowTokenDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>API Token Created</DialogTitle>
+            <DialogDescription>
+              Your API token has been created. Copy it now - you won't be able to see it again!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Your API Token</Label>
+              <div className="flex items-center space-x-2 mt-2">
+                <Textarea
+                  value={createdToken || ""}
+                  readOnly
+                  className="font-mono text-sm"
+                  rows={3}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => copyToClipboard(createdToken || "")}
+                >
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-4 rounded-lg">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                <strong>Important:</strong> Store this token securely. You won't be able to see it again.
+                Use it in the Authorization header: <code>Bearer your-token-here</code>
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                setShowTokenDialog(false);
+                setCreatedToken(null);
+              }}
+              className="w-full"
+            >
+              I've Saved My Token
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

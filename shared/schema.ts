@@ -107,6 +107,17 @@ export const whitelistBlocks = pgTable("whitelist_blocks", {
   blockedReason: text("blocked_reason"),
 });
 
+export const apiTokens = pgTable("api_tokens", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  token: text("token").notNull().unique(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  lastUsed: timestamp("last_used"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   dataSources: many(dataSources),
@@ -115,6 +126,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   auditLogs: many(auditLogs),
   sessions: many(sessions),
   indicatorNotes: many(indicatorNotes),
+  apiTokens: many(apiTokens),
 }));
 
 export const dataSourcesRelations = relations(dataSources, ({ one, many }) => ({
@@ -181,6 +193,13 @@ export const sessionsRelations = relations(sessions, ({ one }) => ({
   }),
 }));
 
+export const apiTokensRelations = relations(apiTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [apiTokens.userId],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -234,6 +253,12 @@ export const insertWhitelistBlockSchema = createInsertSchema(whitelistBlocks).om
   attemptedAt: true,
 });
 
+export const insertApiTokenSchema = createInsertSchema(apiTokens).omit({
+  id: true,
+  createdAt: true,
+  lastUsed: true,
+});
+
 // Types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -253,3 +278,5 @@ export type IndicatorNote = typeof indicatorNotes.$inferSelect;
 export type InsertIndicatorNote = z.infer<typeof insertIndicatorNoteSchema>;
 export type WhitelistBlock = typeof whitelistBlocks.$inferSelect;
 export type InsertWhitelistBlock = z.infer<typeof insertWhitelistBlockSchema>;
+export type ApiToken = typeof apiTokens.$inferSelect;
+export type InsertApiToken = z.infer<typeof insertApiTokenSchema>;

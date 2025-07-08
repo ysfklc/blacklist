@@ -8,6 +8,7 @@ import {
   settings,
   sessions,
   indicatorNotes,
+  apiTokens,
   type User, 
   type InsertUser,
   type DataSource,
@@ -23,7 +24,9 @@ import {
   type Setting,
   type InsertSetting,
   type IndicatorNote,
-  type InsertIndicatorNote
+  type InsertIndicatorNote,
+  type ApiToken,
+  type InsertApiToken
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, ilike, desc, count, sql, inArray, isNotNull } from "drizzle-orm";
@@ -97,6 +100,14 @@ export interface IStorage {
   createIndicatorNote(note: InsertIndicatorNote): Promise<IndicatorNote>;
   updateIndicatorNote(id: number, content: string, userId: number): Promise<IndicatorNote>;
   deleteIndicatorNote(id: number, userId: number): Promise<void>;
+
+  // API token operations
+  getApiTokens(userId: number): Promise<ApiToken[]>;
+  createApiToken(token: InsertApiToken): Promise<ApiToken>;
+  deleteApiToken(id: number, userId: number): Promise<void>;
+  updateApiTokenLastUsed(token: string): Promise<void>;
+  getApiTokenByToken(token: string): Promise<ApiToken | undefined>;
+  revokeApiToken(id: number, userId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1124,6 +1135,51 @@ export class DatabaseStorage implements IStorage {
       whitelistEntryId,
       blockedReason: `Blocked by whitelist entry during feed processing`,
     });
+  }
+
+  // API token operations
+  async getApiTokens(userId: number): Promise<ApiToken[]> {
+    return await db
+      .select()
+      .from(apiTokens)
+      .where(eq(apiTokens.userId, userId))
+      .orderBy(desc(apiTokens.createdAt));
+  }
+
+  async createApiToken(token: InsertApiToken): Promise<ApiToken> {
+    const [created] = await db
+      .insert(apiTokens)
+      .values(token)
+      .returning();
+    return created;
+  }
+
+  async deleteApiToken(id: number, userId: number): Promise<void> {
+    await db
+      .delete(apiTokens)
+      .where(and(eq(apiTokens.id, id), eq(apiTokens.userId, userId)));
+  }
+
+  async updateApiTokenLastUsed(token: string): Promise<void> {
+    await db
+      .update(apiTokens)
+      .set({ lastUsed: new Date() })
+      .where(eq(apiTokens.token, token));
+  }
+
+  async getApiTokenByToken(token: string): Promise<ApiToken | undefined> {
+    const [apiToken] = await db
+      .select()
+      .from(apiTokens)
+      .where(and(eq(apiTokens.token, token), eq(apiTokens.isActive, true)));
+    return apiToken || undefined;
+  }
+
+  async revokeApiToken(id: number, userId: number): Promise<void> {
+    await db
+      .update(apiTokens)
+      .set({ isActive: false })
+      .where(and(eq(apiTokens.id, id), eq(apiTokens.userId, userId)));
   }
 }
 
