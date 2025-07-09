@@ -1,0 +1,36 @@
+version: '3.9'
+
+services:
+  app:
+    build: .
+    image: yak/tblacklist:1.0.0
+    container_name: blacklist_app
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    ports:
+      - "8082:8082"
+    depends_on:
+      - db
+    command: >
+      sh -c "
+        npx drizzle-kit push &&
+        npm run build &&
+        npm run start
+      "
+
+  db:
+    image: postgres:17.5
+    container_name: tblacklist_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_blacklist:/var/lib/postgresql/data
+
+
+volumes:
+  pgdata_blacklist:
