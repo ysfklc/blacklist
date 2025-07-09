@@ -262,6 +262,94 @@ export default function ApiDocsPage() {
       roles: ["admin", "user", "reporter"],
       example: `curl -H "Authorization: Bearer ${bearerToken}" \\
   "${window.location.origin}/api/whitelist/blocks?page=1&limit=10"`
+    },
+    {
+      method: "GET",
+      path: "/api/data-sources",
+      description: "Get all data sources",
+      roles: ["admin", "user", "reporter"],
+      example: `curl -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/data-sources"`
+    },
+    {
+      method: "POST",
+      path: "/api/data-sources",
+      description: "Create a new data source",
+      body: {
+        name: "AlienVault OTX",
+        url: "https://otx.alienvault.com/api/v1/indicators/export",
+        fetchInterval: 3600,
+        indicatorType: "ip",
+        isActive: true
+      },
+      roles: ["admin"],
+      example: `curl -X POST \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "AlienVault OTX",
+    "url": "https://otx.alienvault.com/api/v1/indicators/export",
+    "fetchInterval": 3600,
+    "indicatorType": "ip",
+    "isActive": true
+  }' \\
+  "${window.location.origin}/api/data-sources"`
+    },
+    {
+      method: "PUT",
+      path: "/api/data-sources/:id",
+      description: "Update an existing data source",
+      body: {
+        name: "Updated Data Source",
+        fetchInterval: 7200,
+        isActive: false
+      },
+      roles: ["admin"],
+      example: `curl -X PUT \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "Updated Data Source",
+    "fetchInterval": 7200,
+    "isActive": false
+  }' \\
+  "${window.location.origin}/api/data-sources/123"`
+    },
+    {
+      method: "DELETE",
+      path: "/api/data-sources/:id",
+      description: "Delete a data source",
+      roles: ["admin"],
+      example: `curl -X DELETE \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/data-sources/123"`
+    },
+    {
+      method: "POST",
+      path: "/api/data-sources/:id/pause",
+      description: "Pause a data source (stop automatic fetching)",
+      roles: ["admin"],
+      example: `curl -X POST \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/data-sources/123/pause"`
+    },
+    {
+      method: "POST",
+      path: "/api/data-sources/:id/resume",
+      description: "Resume a paused data source",
+      roles: ["admin"],
+      example: `curl -X POST \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/data-sources/123/resume"`
+    },
+    {
+      method: "POST",
+      path: "/api/data-sources/:id/fetch",
+      description: "Manually trigger data fetch for a data source",
+      roles: ["admin"],
+      example: `curl -X POST \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/data-sources/123/fetch"`
     }
   ];
 
