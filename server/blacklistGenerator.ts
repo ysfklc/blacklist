@@ -21,6 +21,9 @@ export async function generateBlacklistFiles(): Promise<void> {
     await generateDomainFiles(maxLinesPerFile);
     await generateHashFiles(maxLinesPerFile);
     await generateURLFiles(maxLinesPerFile);
+    
+    // Generate proxy format files
+    await generateProxyFiles();
 
     console.log("Blacklist files generated successfully");
   } catch (error) {
@@ -30,7 +33,7 @@ export async function generateBlacklistFiles(): Promise<void> {
 }
 
 async function ensureDirectories(): Promise<void> {
-  const dirs = ["IP", "Domain", "Hash", "URL"];
+  const dirs = ["IP", "Domain", "Hash", "URL", "Proxy"];
   
   for (const dir of dirs) {
     const dirPath = path.join(BLACKLIST_DIR, dir);
@@ -69,6 +72,55 @@ async function generateHashFiles(maxLinesPerFile: number): Promise<void> {
 async function generateURLFiles(maxLinesPerFile: number): Promise<void> {
   const indicators = await storage.getActiveIndicatorsByType("url");
   await writeIndicatorsToFiles(indicators, "URL", "BlackURL", maxLinesPerFile);
+}
+
+async function generateProxyFiles(): Promise<void> {
+  const settings = await storage.getSettings();
+  const domainCategory = settings.find(s => s.key === "proxyFormat.domainCategory")?.value || "blocked_domains";
+  const urlCategory = settings.find(s => s.key === "proxyFormat.urlCategory")?.value || "blocked_urls";
+  
+  const domainIndicators = await storage.getActiveIndicatorsByType("domain");
+  const urlIndicators = await storage.getActiveIndicatorsByType("url");
+  
+  const proxyDir = path.join(BLACKLIST_DIR, "Proxy");
+  
+  // Clear existing proxy files
+  try {
+    const files = await fs.readdir(proxyDir);
+    for (const file of files) {
+      if (file.startsWith("proxy_") && file.endsWith(".txt")) {
+        await fs.unlink(path.join(proxyDir, file));
+      }
+    }
+  } catch (error) {
+    // Directory might not exist or be empty
+  }
+  
+  // Generate proxy format file
+  let content = "";
+  
+  // Add domain category
+  if (domainIndicators.length > 0 && domainCategory) {
+    content += `define category ${domainCategory}\n`;
+    for (const indicator of domainIndicators) {
+      content += `  "${indicator.value}"\n`;
+    }
+    content += "end\n\n";
+  }
+  
+  // Add URL category
+  if (urlIndicators.length > 0 && urlCategory) {
+    content += `define category ${urlCategory}\n`;
+    for (const indicator of urlIndicators) {
+      content += `  "${indicator.value}"\n`;
+    }
+    content += "end\n\n";
+  }
+  
+  // Write proxy file only if there's content
+  if (content.trim()) {
+    await fs.writeFile(path.join(proxyDir, "proxy_categories.txt"), content, "utf-8");
+  }
 }
 
 async function writeIndicatorsToFiles(

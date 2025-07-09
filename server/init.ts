@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, settings } from "@shared/schema";
 import { hashPassword } from "./auth";
 import { eq } from "drizzle-orm";
 import fs from "fs/promises";
@@ -37,7 +37,7 @@ export async function initializeDatabase(): Promise<void> {
 
     // Ensure public blacklist directories exist
     const blacklistDir = path.join(process.cwd(), "public", "blacklist");
-    const dirs = ["IP", "Domain", "Hash", "URL"];
+    const dirs = ["IP", "Domain", "Hash", "URL", "Proxy"];
     
     for (const dir of dirs) {
       const dirPath = path.join(blacklistDir, dir);
@@ -49,6 +49,30 @@ export async function initializeDatabase(): Promise<void> {
     }
     
     console.log("Public blacklist directories initialized");
+    
+    // Initialize proxy format settings if they don't exist
+    const proxyFormatSettings = [
+      { key: "proxyFormat.domainCategory", value: "blocked_domains" },
+      { key: "proxyFormat.urlCategory", value: "blocked_urls" }
+    ];
+    
+    for (const setting of proxyFormatSettings) {
+      const existing = await db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, setting.key))
+        .limit(1);
+      
+      if (existing.length === 0) {
+        await db.insert(settings).values({
+          key: setting.key,
+          value: setting.value,
+          encrypted: false,
+        });
+      }
+    }
+    
+    console.log("Proxy format settings initialized");
     console.log("Database initialization complete");
     
   } catch (error) {

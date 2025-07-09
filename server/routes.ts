@@ -1480,7 +1480,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/public-links/files", authenticateToken, async (req, res) => {
     try {
       const blacklistPath = path.join(process.cwd(), "public/blacklist");
-      const types = ["IP", "Domain", "Hash", "URL"];
+      const types = ["IP", "Domain", "Hash", "URL", "Proxy"];
       const files: Record<string, string[]> = {};
 
       for (const type of types) {
@@ -1512,7 +1512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/public/blacklist/files", async (req, res) => {
     try {
       const blacklistPath = path.join(process.cwd(), "public/blacklist");
-      const types = ["IP", "Domain", "Hash", "URL"];
+      const types = ["IP", "Domain", "Hash", "URL", "Proxy"];
       const files: Record<string, string[]> = {};
 
       for (const type of types) {

@@ -49,6 +49,11 @@ export default function Settings() {
     password: "",
   });
 
+  const [proxyFormatSettings, setProxyFormatSettings] = useState({
+    domainCategory: "blocked_domains",
+    urlCategory: "blocked_urls",
+  });
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -91,6 +96,12 @@ export default function Settings() {
         port: parseInt(settingsMap["proxy.port"] || "8080"),
         username: settingsMap["proxy.username"] || "",
         password: settingsMap["proxy.password"] || "",
+      });
+
+      // Update proxy format settings
+      setProxyFormatSettings({
+        domainCategory: settingsMap["proxyFormat.domainCategory"] || "blocked_domains",
+        urlCategory: settingsMap["proxyFormat.urlCategory"] || "blocked_urls",
       });
     }
   }, [settings]);
@@ -176,6 +187,27 @@ export default function Settings() {
       toast({
         title: "Error",
         description: "Failed to save proxy settings",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveProxyFormatMutation = useMutation({
+    mutationFn: () => apiRequest("PUT", "/api/settings", {
+      "proxyFormat.domainCategory": proxyFormatSettings.domainCategory,
+      "proxyFormat.urlCategory": proxyFormatSettings.urlCategory,
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
+      toast({
+        title: "Success",
+        description: "Proxy format settings saved successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save proxy format settings",
         variant: "destructive",
       });
     },
@@ -507,6 +539,7 @@ export default function Settings() {
                       onChange={(e) => setProxySettings({ ...proxySettings, password: e.target.value })}
                     />
                   </div>
+
                 </div>
               )}
               
@@ -518,6 +551,60 @@ export default function Settings() {
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save Proxy Settings
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Proxy Format Configuration */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Proxy Format Configuration</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={(e) => { e.preventDefault(); saveProxyFormatMutation.mutate(); }} className="space-y-4">
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Configure category names for proxy format blacklist files. These files contain domain and URL indicators in category-based format suitable for proxy servers.
+                </p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="proxy-format-domain-category">Domain Category Name</Label>
+                    <Input
+                      id="proxy-format-domain-category"
+                      placeholder="blocked_domains"
+                      value={proxyFormatSettings.domainCategory}
+                      onChange={(e) => setProxyFormatSettings({ ...proxyFormatSettings, domainCategory: e.target.value })}
+                    />
+                    <p className="text-sm text-gray-600 mt-1">
+                      Category name used for domain indicators in proxy format files
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="proxy-format-url-category">URL Category Name</Label>
+                    <Input
+                      id="proxy-format-url-category"
+                      placeholder="blocked_urls"
+                      value={proxyFormatSettings.urlCategory}
+                      onChange={(e) => setProxyFormatSettings({ ...proxyFormatSettings, urlCategory: e.target.value })}
+                    />
+                    <p className="text-sm text-gray-600 mt-1">
+                      Category name used for URL indicators in proxy format files
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end">
+                <Button
+                  type="submit"
+                  disabled={saveProxyFormatMutation.isPending}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Proxy Format Settings
                 </Button>
               </div>
             </form>

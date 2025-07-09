@@ -32,6 +32,7 @@ interface BlacklistFiles {
   Domain: string[];
   Hash: string[];
   URL: string[];
+  Proxy: string[];
 }
 
 export default function PublicLinks() {
@@ -291,6 +292,48 @@ export default function PublicLinks() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Proxy Format Files */}
+          <Card>
+            <CardContent className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <div className="h-8 w-8 bg-purple-500 rounded-full flex items-center justify-center">
+                    <svg className="h-4 w-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-500 truncate">Proxy Format Files</p>
+                  <p className="text-lg font-medium text-gray-900">{files?.Proxy?.length || 0} files</p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="text-sm text-gray-500 space-y-1">
+                  <p>Format: Category-based proxy format</p>
+                  <p>Contains: Domains and URLs</p>
+                </div>
+                <div className="mt-3 space-y-1">
+                  {files?.Proxy && files.Proxy.length > 0 ? (
+                    files.Proxy.map((file, index) => (
+                      <div key={file}>
+                        <a 
+                          href={`/public/blacklist/Proxy/${file}`}
+                          download
+                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
+                        >
+                          {file} <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No files available</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* API Endpoints */}
@@ -356,6 +399,20 @@ export default function PublicLinks() {
                   <Copy className="h-4 w-4" />
                 </Button>
               </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Proxy Format Directory</p>
+                  <p className="text-sm text-gray-500 font-mono">/public/blacklist/Proxy/</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard("/public/blacklist/Proxy/")}
+                  className="text-blue-600 hover:text-blue-900"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -372,6 +429,7 @@ export default function PublicLinks() {
                 <ul className="list-disc list-inside space-y-1">
                   <li>Each file contains a maximum of 100,000 lines (default)</li>
                   <li>Domain entries include both domain.com and *.domain.com formats</li>
+                  <li>Proxy format files use category-based structure with quoted entries</li>
                   <li>Files are updated automatically based on fetch intervals</li>
                   <li>All files are in plain text format (.txt)</li>
                 </ul>

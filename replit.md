@@ -4,6 +4,13 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-09**: Fixed proxy format configuration separation from HTTP proxy settings
+  - Separated proxy format settings (for blacklist file categories) from HTTP proxy settings (for network requests)
+  - Created dedicated "Proxy Format Configuration" section in settings with separate save functionality
+  - Updated database initialization to include default proxy format settings (proxyFormat.domainCategory, proxyFormat.urlCategory)
+  - Fixed blacklist generator to use correct proxy format settings keys instead of proxy configuration keys
+  - Added proxy format files to Public Blacklist Links page with download functionality
+  - Proxy format files now generate correctly with user-configurable category names
 - **2025-07-09**: Successfully completed migration from Replit Agent to Replit environment
   - Set up PostgreSQL database with complete schema initialization
   - Fixed missing tsx package dependency for TypeScript execution
