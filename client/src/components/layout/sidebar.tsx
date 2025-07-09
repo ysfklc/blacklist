@@ -38,12 +38,14 @@ export default function Sidebar() {
       style={{ backgroundColor: 'rgb(17 24 39 / var(--tw-bg-opacity, 1))' }}
     >
       <div className="flex items-center justify-between h-16 px-4" style={{ backgroundColor: 'rgb(17 24 39 / var(--tw-bg-opacity, 1))' }}>
-        <div className="flex items-center">
-          <Logo size="sm" />
-          {!isCollapsed && (
-            <span className="ml-3 text-white text-lg font-semibold">The Blacklist</span>
-          )}
-        </div>
+        <Link href="/">
+          <a className="flex items-center hover:opacity-80 transition-opacity">
+            <Logo size="sm" />
+            {!isCollapsed && (
+              <span className="ml-3 text-white text-lg font-semibold">The Blacklist</span>
+            )}
+          </a>
+        </Link>
         <button
           onClick={toggleSidebar}
           className="text-gray-300 hover:text-white transition-colors p-1 rounded"
