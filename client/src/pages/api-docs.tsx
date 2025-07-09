@@ -542,7 +542,7 @@ print(f"Created indicator: {response.json()}")`}</code>
                   onClick={() => copyToClipboard(`import requests
 
 # Configuration
-API_BASE_URL = "https://your-domain.replit.app"
+API_BASE_URL = "https://localhost:8082"
 API_TOKEN = "${bearerToken || 'your-api-token-here'}"
 
 headers = {
@@ -577,7 +577,7 @@ print(f"Created indicator: {response.json()}")`)}
               <div>
                 <h3 className="text-lg font-semibold mb-2">JavaScript/Node.js Example</h3>
                 <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
-                  <code>{`const API_BASE_URL = "https://your-domain.replit.app";
+                  <code>{`const API_BASE_URL = "https://localhost:8082";
 const API_TOKEN = "${bearerToken || 'your-api-token-here'}";
 
 const headers = {
@@ -616,7 +616,7 @@ createIndicator(newIndicator).then(result => {
                 </pre>
                 <Button
                   variant="outline"
-                  onClick={() => copyToClipboard(`const API_BASE_URL = "https://your-domain.replit.app";
+                  onClick={() => copyToClipboard(`const API_BASE_URL = "https://localhost:8082";
 const API_TOKEN = "${bearerToken || 'your-api-token-here'}";
 
 const headers = {
