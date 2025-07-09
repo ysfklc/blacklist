@@ -11,6 +11,8 @@ A comprehensive threat intelligence platform built with Express.js backend and R
   - Application running cleanly on port 5000 with proper authentication
   - Enhanced API documentation with comprehensive data source endpoints
   - All data source operations restricted to admin-only access with proper role validation
+  - Fixed authentication issues with data source API endpoints by updating to use authenticateTokenOrApiKey
+  - All data source endpoints now support both JWT tokens and API tokens for programmatic access
 - **2025-07-09**: Enhanced whitelist API operations with comprehensive functionality
   - Added API key authentication support to all whitelist endpoints
   - Implemented automatic type detection for whitelist entries (supports private IPs)

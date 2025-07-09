@@ -274,12 +274,12 @@ export default function ApiDocsPage() {
     {
       method: "POST",
       path: "/api/data-sources",
-      description: "Create a new data source",
+      description: "Create a new data source. The indicatorTypes field accepts an array of one or more indicator types (ip, domain, hash, url).",
       body: {
         name: "AlienVault OTX",
         url: "https://otx.alienvault.com/api/v1/indicators/export",
         fetchInterval: 3600,
-        indicatorType: "ip",
+        indicatorTypes: ["ip", "domain"],
         isActive: true
       },
       roles: ["admin"],
@@ -290,7 +290,7 @@ export default function ApiDocsPage() {
     "name": "AlienVault OTX",
     "url": "https://otx.alienvault.com/api/v1/indicators/export",
     "fetchInterval": 3600,
-    "indicatorType": "ip",
+    "indicatorTypes": ["ip", "domain"],
     "isActive": true
   }' \\
   "${window.location.origin}/api/data-sources"`

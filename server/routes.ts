@@ -656,7 +656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Data sources routes
-  app.get("/api/data-sources", authenticateToken, async (req, res) => {
+  app.get("/api/data-sources", authenticateTokenOrApiKey, async (req, res) => {
     try {
       const dataSources = await storage.getDataSources();
       res.json(dataSources);
@@ -665,7 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/data-sources", authenticateToken, requireRole(["admin"]), async (req, res) => {
+  app.post("/api/data-sources", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const validatedData = insertDataSourceSchema.parse({
         ...req.body,
@@ -693,7 +693,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/data-sources/:id", authenticateToken, requireRole(["admin"]), async (req, res) => {
+  app.put("/api/data-sources/:id", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const dataSource = await storage.updateDataSource(id, req.body);
@@ -714,7 +714,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/data-sources/:id", authenticateToken, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/data-sources/:id", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteDataSource(id);
@@ -736,7 +736,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Pause data source endpoint
-  app.post("/api/data-sources/:id/pause", authenticateToken, requireRole(["admin"]), async (req, res) => {
+  app.post("/api/data-sources/:id/pause", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -759,7 +759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Resume data source endpoint
-  app.post("/api/data-sources/:id/resume", authenticateToken, requireRole(["admin"]), async (req, res) => {
+  app.post("/api/data-sources/:id/resume", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
@@ -782,7 +782,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Manual fetch endpoint
-  app.post("/api/data-sources/:id/fetch", authenticateToken, requireRole(["admin"]), async (req, res) => {
+  app.post("/api/data-sources/:id/fetch", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
