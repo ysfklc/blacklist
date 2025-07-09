@@ -25,10 +25,9 @@ interface IndicatorNote {
 
 interface IndicatorNotesProps {
   indicatorId: number;
-  legacyNote?: string | null;
 }
 
-export default function IndicatorNotes({ indicatorId, legacyNote }: IndicatorNotesProps) {
+export default function IndicatorNotes({ indicatorId }: IndicatorNotesProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -168,7 +167,7 @@ export default function IndicatorNotes({ indicatorId, legacyNote }: IndicatorNot
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-5 w-5" />
-            Notes ({(notes?.length || 0) + (legacyNote ? 1 : 0)})
+            Notes ({notes?.length || 0})
           </div>
           {!isAddingNote && (
             <Button
@@ -218,26 +217,8 @@ export default function IndicatorNotes({ indicatorId, legacyNote }: IndicatorNot
         )}
 
         {/* Notes list */}
-        {(legacyNote || (notes && notes.length > 0)) ? (
+        {notes && notes.length > 0 ? (
           <div className="space-y-3">
-            {/* Legacy Note (if exists) */}
-            {legacyNote && (
-              <div className="border rounded-lg p-4 bg-amber-50 border-amber-200">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2 text-sm text-amber-700">
-                    <span className="font-medium">Legacy Note</span>
-                    <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">
-                      imported
-                    </Badge>
-                  </div>
-                </div>
-                <p className="text-gray-800 whitespace-pre-wrap">{legacyNote}</p>
-                <p className="text-xs text-amber-600 mt-2">
-                  This note was imported from the legacy system. Consider adding a new note with current information.
-                </p>
-              </div>
-            )}
-            
             {/* Regular Notes */}
             {notes?.map((note) => (
               <div key={note.id} className="border rounded-lg p-4">

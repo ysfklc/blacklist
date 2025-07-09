@@ -49,6 +49,49 @@ const INVALID_URLS = [
   /^https?:\/\/172\.(1[6-9]|2[0-9]|3[01])\./i,
 ];
 
+function detectWhitelistType(value: string): { type: string; hashType?: string; error?: string } | null {
+  if (!value || typeof value !== 'string') {
+    return null;
+  }
+  
+  const trimmedValue = value.trim();
+  
+  // Basic format validation
+  if (trimmedValue.length === 0) {
+    return null;
+  }
+  
+  // IP address check (more permissive for whitelist)
+  const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:\/(?:[0-9]|[1-2][0-9]|3[0-2]))?$/;
+  if (ipRegex.test(trimmedValue)) {
+    return { type: 'ip' };
+  }
+  
+  // Domain check
+  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
+  if (domainRegex.test(trimmedValue) && trimmedValue.includes('.')) {
+    return { type: 'domain' };
+  }
+  
+  // Hash check
+  const hashType = detectHashType(trimmedValue);
+  if (hashType) {
+    return { type: 'hash', hashType };
+  }
+  
+  // URL check
+  try {
+    const url = new URL(trimmedValue);
+    if (url.protocol === 'http:' || url.protocol === 'https:') {
+      return { type: 'url' };
+    }
+  } catch (e) {
+    // Not a valid URL
+  }
+  
+  return null;
+}
+
 function detectIndicatorType(value: string): { type: string; hashType?: string; error?: string } | null {
   if (!value || typeof value !== 'string') {
     return null;
@@ -816,7 +859,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/indicators", authenticateTokenOrApiKey, requireRole(["admin", "user"]), async (req, res) => {
     try {
-      const { durationHours, value, ...bodyData } = req.body;
+      const { durationHours, value, notes, ...bodyData } = req.body;
       
       // Validate input
       if (!value || typeof value !== 'string') {
@@ -910,12 +953,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.tempActivateIndicator(indicator.id, durationHours, req.user.userId);
       }
       
+      // If notes are provided, create a note for the indicator
+      if (notes && typeof notes === 'string' && notes.trim()) {
+        try {
+          await storage.createIndicatorNote({
+            indicatorId: indicator.id,
+            userId: req.user.userId,
+            content: notes.trim(),
+          });
+        } catch (noteError) {
+          console.error(`[NOTE] Failed to create note for indicator ${indicator.id}:`, noteError);
+        }
+      }
+      
       await storage.createAuditLog({
         level: "info",
         action: "create",
         resource: "indicator",
         resourceId: indicator.id.toString(),
-        details: `Created new indicator: ${indicator.value} (${detectedType.type})${durationHours ? ` with ${durationHours}h duration` : ''}`,
+        details: `Created new indicator: ${indicator.value} (${detectedType.type})${durationHours ? ` with ${durationHours}h duration` : ''}${notes ? ' with notes' : ''}`,
         userId: req.user.userId,
         ipAddress: req.ip,
       });
@@ -1100,7 +1156,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Whitelist routes
-  app.get("/api/whitelist", authenticateToken, async (req, res) => {
+  app.get("/api/whitelist", authenticateTokenOrApiKey, async (req, res) => {
     try {
       const whitelist = await storage.getWhitelist();
       res.json(whitelist);
@@ -1109,10 +1165,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/whitelist", authenticateToken, requireRole(["admin", "user"]), async (req, res) => {
+  app.post("/api/whitelist", authenticateTokenOrApiKey, requireRole(["admin", "user"]), async (req, res) => {
     try {
+      const { value, type, reason } = req.body;
+      
+      // Validate input
+      if (!value || typeof value !== 'string') {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: "Value is required and must be a string" 
+        });
+      }
+      
+      // Auto-detect type if not provided
+      let finalType = type;
+      if (!type) {
+        const detectedType = detectWhitelistType(value);
+        if (!detectedType) {
+          return res.status(400).json({ 
+            error: "Invalid whitelist value", 
+            details: "The provided value does not match any recognized pattern (IP, domain, hash, or URL)" 
+          });
+        }
+        finalType = detectedType.type;
+      }
+      
       const validatedData = insertWhitelistSchema.parse({
-        ...req.body,
+        value: value.trim(),
+        type: finalType,
+        reason: reason || null,
         createdBy: req.user.userId,
       });
 
@@ -1152,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/whitelist/:id", authenticateToken, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/whitelist/:id", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.deleteWhitelistEntry(id);
@@ -1173,8 +1254,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Bulk delete whitelist entries
+  app.post("/api/whitelist/bulk-delete", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
+    try {
+      const { ids } = req.body;
+      
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: "IDs array is required and must not be empty" 
+        });
+      }
+      
+      let successCount = 0;
+      let errorCount = 0;
+      
+      for (const id of ids) {
+        try {
+          await storage.deleteWhitelistEntry(parseInt(id));
+          successCount++;
+        } catch (error) {
+          errorCount++;
+        }
+      }
+      
+      await storage.createAuditLog({
+        level: "info",
+        action: "bulk_delete",
+        resource: "whitelist",
+        details: `Bulk deleted ${successCount} whitelist entries (${errorCount} failed)`,
+        userId: req.user.userId,
+        ipAddress: req.ip,
+      });
+
+      res.json({ 
+        message: `Bulk deletion completed`, 
+        deleted: successCount, 
+        errors: errorCount 
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Check if value is whitelisted
+  app.post("/api/whitelist/check", authenticateTokenOrApiKey, async (req, res) => {
+    try {
+      const { value, type } = req.body;
+      
+      if (!value || typeof value !== 'string') {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: "Value is required and must be a string" 
+        });
+      }
+      
+      // Auto-detect type if not provided
+      let finalType = type;
+      if (!type) {
+        const detectedType = detectWhitelistType(value);
+        if (!detectedType) {
+          return res.status(400).json({ 
+            error: "Invalid value", 
+            details: "The provided value does not match any recognized pattern (IP, domain, hash, or URL)" 
+          });
+        }
+        finalType = detectedType.type;
+      }
+      
+      const isWhitelisted = await storage.isWhitelisted(value.trim(), finalType);
+      
+      res.json({ 
+        value: value.trim(), 
+        type: finalType,
+        isWhitelisted 
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Whitelist blocks routes
-  app.get("/api/whitelist/blocks", authenticateToken, async (req, res) => {
+  app.get("/api/whitelist/blocks", authenticateTokenOrApiKey, async (req, res) => {
     try {
       const { page = 1, limit = 25 } = req.query;
       const blocks = await storage.getWhitelistBlocks(

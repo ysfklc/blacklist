@@ -10,7 +10,6 @@ interface Indicator {
   type: string;
   source: string;
   isActive: boolean;
-  notes: string | null;
   notesCount?: number;
   tempActiveUntil?: string | null;
   createdAt: string;
@@ -88,7 +87,7 @@ export default function IndicatorDetailsModal({
           </Card>
 
           {/* Notes Section */}
-          <IndicatorNotes indicatorId={indicator.id} legacyNote={indicator.notes} />
+          <IndicatorNotes indicatorId={indicator.id} />
         </div>
       </DialogContent>
     </Dialog>

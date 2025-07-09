@@ -183,6 +183,85 @@ export default function ApiDocsPage() {
       roles: ["admin", "user", "reporter"],
       example: `curl -H "Authorization: Bearer ${bearerToken}" \\
   "${window.location.origin}/api/indicators/123/notes"`
+    },
+    {
+      method: "GET",
+      path: "/api/whitelist",
+      description: "Get all whitelist entries",
+      roles: ["admin", "user", "reporter"],
+      example: `curl -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/whitelist"`
+    },
+    {
+      method: "POST",
+      path: "/api/whitelist",
+      description: "Add a new whitelist entry (type is automatically detected from value)",
+      body: {
+        value: "192.168.1.0/24",
+        reason: "Internal network range - safe to whitelist"
+      },
+      roles: ["admin", "user"],
+      example: `curl -X POST \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "value": "192.168.1.0/24",
+    "reason": "Internal network range - safe to whitelist"
+  }' \\
+  "${window.location.origin}/api/whitelist"`
+    },
+    {
+      method: "DELETE",
+      path: "/api/whitelist/:id",
+      description: "Delete a whitelist entry",
+      roles: ["admin"],
+      example: `curl -X DELETE \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/whitelist/123"`
+    },
+    {
+      method: "POST",
+      path: "/api/whitelist/bulk-delete",
+      description: "Delete multiple whitelist entries",
+      body: {
+        ids: [1, 2, 3]
+      },
+      roles: ["admin"],
+      example: `curl -X POST \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "ids": [1, 2, 3]
+  }' \\
+  "${window.location.origin}/api/whitelist/bulk-delete"`
+    },
+    {
+      method: "POST",
+      path: "/api/whitelist/check",
+      description: "Check if a value is whitelisted (type is automatically detected)",
+      body: {
+        value: "192.168.1.100"
+      },
+      roles: ["admin", "user", "reporter"],
+      example: `curl -X POST \\
+  -H "Authorization: Bearer ${bearerToken}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "value": "192.168.1.100"
+  }' \\
+  "${window.location.origin}/api/whitelist/check"`
+    },
+    {
+      method: "GET",
+      path: "/api/whitelist/blocks",
+      description: "Get whitelist block events (when indicators were blocked by whitelist)",
+      params: [
+        { name: "page", type: "number", description: "Page number (default: 1)" },
+        { name: "limit", type: "number", description: "Items per page (default: 25)" }
+      ],
+      roles: ["admin", "user", "reporter"],
+      example: `curl -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/whitelist/blocks?page=1&limit=10"`
     }
   ];
 

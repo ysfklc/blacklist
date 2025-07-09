@@ -349,7 +349,6 @@ export class DatabaseStorage implements IStorage {
         source: indicators.source,
         sourceId: indicators.sourceId,
         isActive: indicators.isActive,
-        notes: indicators.notes,
         tempActiveUntil: indicators.tempActiveUntil,
         createdAt: indicators.createdAt,
         updatedAt: indicators.updatedAt,
@@ -442,7 +441,6 @@ export class DatabaseStorage implements IStorage {
           source: indicator.source || 'unknown',
           sourceId: indicator.sourceId,
           isActive: indicator.isActive ?? true,
-          notes: indicator.notes,
           createdBy: indicator.createdBy,
         })
         .returning();

@@ -4,6 +4,14 @@
 A comprehensive threat intelligence platform built with Express.js backend and React frontend. The application enables cybersecurity teams to manage threat indicators, data sources, and security analytics with role-based access control.
 
 ## Recent Changes
+- **2025-07-09**: Enhanced whitelist API operations with comprehensive functionality
+  - Added API key authentication support to all whitelist endpoints
+  - Implemented automatic type detection for whitelist entries (supports private IPs)
+  - Added POST /api/whitelist/check endpoint to verify if values are whitelisted
+  - Added POST /api/whitelist/bulk-delete endpoint for bulk deletion operations
+  - Created separate detectWhitelistType function that allows private IP ranges
+  - Updated POST /api/indicators endpoint to support notes creation during indicator creation
+  - All whitelist operations now support both JWT tokens and API keys for authentication
 - **2025-07-08**: Added temp_active_until column visibility to indicators table UI
   - Added "Temp Active Until" column header to indicators table
   - Displays formatted date and time when temporary activation is set

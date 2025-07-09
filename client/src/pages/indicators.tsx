@@ -21,7 +21,6 @@ import TempActivateDialog from "@/components/temp-activate-dialog";
 
 const indicatorSchema = z.object({
   value: z.string().min(1, "Value is required"),
-  notes: z.string().optional(),
 });
 
 type IndicatorFormData = z.infer<typeof indicatorSchema>;
@@ -32,7 +31,6 @@ interface Indicator {
   type: string;
   source: string;
   isActive: boolean;
-  notes: string | null;
   notesCount?: number;
   tempActiveUntil?: string | null;
   createdAt: string;
@@ -120,7 +118,6 @@ export default function Indicators() {
     resolver: zodResolver(indicatorSchema),
     defaultValues: {
       value: "",
-      notes: "",
     },
   });
 
@@ -345,19 +342,7 @@ export default function Indicators() {
                         )}
                       />
 
-                      <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Notes</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Optional notes" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+
                       <div className="flex justify-end space-x-2">
                         <Button
                           type="button"
@@ -578,11 +563,9 @@ export default function Indicators() {
                             <MessageSquare className="h-3 w-3" />
                             {(() => {
                               const notesCount = parseInt(indicator.notesCount?.toString() || '0', 10);
-                              const legacyNotesCount = indicator.notes ? 1 : 0;
-                              const totalCount = notesCount + legacyNotesCount;
-                              return totalCount > 0 && (
+                              return notesCount > 0 && (
                                 <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center min-w-3 text-[10px]">
-                                  {totalCount}
+                                  {notesCount}
                                 </span>
                               );
                             })()}
