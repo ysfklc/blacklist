@@ -31,15 +31,16 @@ export default function AuditLogs() {
     endDate: "",
   });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const { user } = useAuth();
   const { toast } = useToast();
 
   const { data: logs, isLoading } = useQuery({
-    queryKey: ["/api/audit-logs", page, filters],
+    queryKey: ["/api/audit-logs", page, pageSize, filters],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
-        limit: "50",
+        limit: pageSize.toString(),
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v && v !== "all")),
       });
       const response = await fetch(`/api/audit-logs?${params}`, {
@@ -85,6 +86,11 @@ export default function AuditLogs() {
         variant: "destructive",
       });
     }
+  };
+
+  const handlePageSizeChange = (newSize: string) => {
+    setPageSize(parseInt(newSize));
+    setPage(1); // Reset to first page when changing page size
   };
 
   const getLevelColor = (level: string) => {
@@ -236,8 +242,10 @@ export default function AuditLogs() {
                       <TableCell className="text-sm text-muted-foreground capitalize">
                         {log.resource.replace('_', ' ')}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                        {log.details}
+                      <TableCell className="text-sm text-muted-foreground max-w-sm">
+                        <div className="truncate" title={log.details}>
+                          {log.details}
+                        </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {log.ipAddress || "-"}
@@ -253,11 +261,36 @@ export default function AuditLogs() {
         {/* Pagination */}
         {logs?.pagination && (
           <div className="mt-6 flex items-center justify-between">
-            <div className="text-sm text-muted-foreground">
-              Showing {logs.pagination.start} to {logs.pagination.end} of{" "}
-              {logs.pagination.total} results
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-700">
+                Showing {logs.pagination.start} to {logs.pagination.end} of{" "}
+                {logs.pagination.total} results
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Items per page:</span>
+                <Select value={pageSize.toString()} onValueChange={handlePageSizeChange}>
+                  <SelectTrigger className="w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="250">250</SelectItem>
+                    <SelectItem value="500">500</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="flex space-x-2">
+            <div className="flex items-center space-x-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(1)}
+                disabled={page === 1}
+              >
+                First
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -266,6 +299,89 @@ export default function AuditLogs() {
               >
                 Previous
               </Button>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center space-x-1">
+                {(() => {
+                  const totalPages = Math.ceil(logs.pagination.total / pageSize);
+                  const currentPage = page;
+                  const pages = [];
+                  
+                  // Calculate which pages to show
+                  let startPage = Math.max(1, currentPage - 2);
+                  let endPage = Math.min(totalPages, currentPage + 2);
+                  
+                  // Adjust if we're near the beginning or end
+                  if (currentPage <= 3) {
+                    endPage = Math.min(5, totalPages);
+                  }
+                  if (currentPage > totalPages - 3) {
+                    startPage = Math.max(1, totalPages - 4);
+                  }
+                  
+                  // Add first page and ellipsis if needed
+                  if (startPage > 1) {
+                    pages.push(
+                      <Button
+                        key={1}
+                        variant={1 === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(1)}
+                        className="w-10"
+                      >
+                        1
+                      </Button>
+                    );
+                    if (startPage > 2) {
+                      pages.push(
+                        <span key="ellipsis1" className="px-2 text-gray-500">
+                          ...
+                        </span>
+                      );
+                    }
+                  }
+                  
+                  // Add visible page numbers
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <Button
+                        key={i}
+                        variant={i === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(i)}
+                        className="w-10"
+                      >
+                        {i}
+                      </Button>
+                    );
+                  }
+                  
+                  // Add last page and ellipsis if needed
+                  if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                      pages.push(
+                        <span key="ellipsis2" className="px-2 text-gray-500">
+                          ...
+                        </span>
+                      );
+                    }
+                    pages.push(
+                      <Button
+                        key={totalPages}
+                        variant={totalPages === currentPage ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(totalPages)}
+                        className="w-10"
+                      >
+                        {totalPages}
+                      </Button>
+                    );
+                  }
+                  
+                  return pages;
+                })()}
+              </div>
+              
               <Button
                 variant="outline"
                 size="sm"
@@ -273,6 +389,14 @@ export default function AuditLogs() {
                 disabled={!logs.pagination.hasNext}
               >
                 Next
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage(Math.ceil(logs.pagination.total / pageSize))}
+                disabled={!logs.pagination.hasNext}
+              >
+                Last
               </Button>
             </div>
           </div>
