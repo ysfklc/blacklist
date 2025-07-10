@@ -38,12 +38,12 @@ export function initializeScheduler() {
   // Check for expired temporary indicators every minute
   cron.schedule("* * * * *", async () => {
     try {
-      const deactivatedCount = await storage.deactivateExpiredTempIndicators();
-      if (deactivatedCount > 0) {
-        console.log(`[SCHEDULER] Deactivated ${deactivatedCount} expired temporary indicators`);
+      const deletedCount = await storage.deleteExpiredTempIndicators();
+      if (deletedCount > 0) {
+        console.log(`[SCHEDULER] Deleted ${deletedCount} expired temporary indicators`);
       }
     } catch (error) {
-      console.error("Error in temporary indicator deactivation scheduler:", error);
+      console.error("Error in temporary indicator deletion scheduler:", error);
     }
   });
 

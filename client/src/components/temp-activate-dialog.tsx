@@ -135,7 +135,7 @@ export default function TempActivateDialog({
 
           <div className="bg-blue-50 p-3 rounded-lg">
             <p className="text-sm text-blue-700">
-              This indicator will remain active for the specified duration, then automatically deactivate. 
+              This indicator will remain active for the specified duration, then automatically be deleted. 
               The system checks for expired temporary indicators every minute.
             </p>
           </div>

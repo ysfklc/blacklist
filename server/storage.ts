@@ -69,7 +69,7 @@ export interface IStorage {
   updateIndicator(id: number, data: Partial<Indicator>): Promise<Indicator>;
   deleteIndicator(id: number): Promise<void>;
   tempActivateIndicator(id: number, durationHours: number, userId: number): Promise<Indicator>;
-  deactivateExpiredTempIndicators(): Promise<number>;
+  deleteExpiredTempIndicators(): Promise<number>;
   isWhitelisted(value: string, type: string): Promise<boolean>;
   bulkCheckWhitelist(values: string[], type: string): Promise<Set<string>>;
   getDistinctIndicatorSources(): Promise<any[]>;
@@ -630,18 +630,25 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async deactivateExpiredTempIndicators(): Promise<number> {
+  async deleteExpiredTempIndicators(): Promise<number> {
     const now = new Date();
     
     try {
-      // Update expired indicators in a single query
+      // Get expired indicators before deleting them
+      const expiredIndicators = await db
+        .select({ id: indicators.id, value: indicators.value })
+        .from(indicators)
+        .where(
+          and(
+            eq(indicators.isActive, true),
+            isNotNull(indicators.tempActiveUntil),
+            sql`${indicators.tempActiveUntil} <= ${now}`
+          )
+        );
+      
+      // Delete expired indicators
       const result = await db
-        .update(indicators)
-        .set({ 
-          isActive: false, 
-          tempActiveUntil: null,
-          updatedAt: new Date()
-        })
+        .delete(indicators)
         .where(
           and(
             eq(indicators.isActive, true),
@@ -651,21 +658,21 @@ export class DatabaseStorage implements IStorage {
         )
         .returning({ id: indicators.id });
       
-      // Create audit logs for each deactivated indicator
-      for (const indicator of result) {
+      // Create audit logs for each deleted indicator
+      for (const indicator of expiredIndicators) {
         await this.createAuditLog({
           level: 'info',
-          action: 'temp_deactivate',
+          action: 'temp_delete',
           resource: 'indicator',
           resourceId: indicator.id.toString(),
-          details: `Automatically deactivated expired temporary indicator`,
+          details: `Automatically deleted expired temporary indicator: ${indicator.value}`,
           userId: 1 // System user
         });
       }
       
       return result.length;
     } catch (error) {
-      console.error('Error deactivating expired temp indicators:', error);
+      console.error('Error deleting expired temp indicators:', error);
       return 0;
     }
   }
