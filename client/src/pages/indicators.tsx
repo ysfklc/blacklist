@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Eye, MessageSquare, Clock } from "lucide-react";
+import { Plus, Trash2, Eye, MessageSquare, Clock, Copy } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -281,6 +281,22 @@ export default function Indicators() {
   const canCreate = user?.role === "admin" || user?.role === "user";
   const canDelete = user?.role === "admin";
 
+  const handleCopyValue = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast({
+        title: "Copied!",
+        description: "Indicator value copied to clipboard",
+      });
+    } catch (error) {
+      toast({
+        title: "Copy failed",
+        description: "Unable to copy to clipboard",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getTypeColor = (type: string) => {
     switch (type) {
       case "ip":
@@ -530,8 +546,19 @@ export default function Indicators() {
                         />
                       </TableCell>
                       <TableCell className="font-mono text-sm max-w-xs">
-                        <div className="truncate" title={indicator.value}>
-                          {indicator.value}
+                        <div className="flex items-center space-x-2">
+                          <div className="truncate" title={indicator.value}>
+                            {indicator.value}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyValue(indicator.value)}
+                            className="h-6 w-6 p-0 flex-shrink-0"
+                            title="Copy indicator value"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
                         </div>
                       </TableCell>
                       <TableCell>

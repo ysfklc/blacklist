@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Edit, Trash2, Pause, Play, Download } from "lucide-react";
+import { Plus, Edit, Trash2, Pause, Play, Download, ExternalLink } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -385,8 +385,21 @@ export default function DataSources() {
                   dataSources?.map((source) => (
                     <TableRow key={source.id}>
                       <TableCell className="font-medium">{source.name}</TableCell>
-                      <TableCell className="text-sm text-gray-500 max-w-xs truncate">
-                        {source.url}
+                      <TableCell className="text-sm text-gray-500 max-w-xs">
+                        <div className="flex items-center space-x-2">
+                          <div className="truncate" title={source.url}>
+                            {source.url}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => window.open(source.url, '_blank', 'noopener,noreferrer')}
+                            className="h-6 w-6 p-0 flex-shrink-0"
+                            title="Open URL in new tab"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                          </Button>
+                        </div>
                       </TableCell>
                       <TableCell className="capitalize">{source.indicatorTypes.join(", ")}</TableCell>
                       <TableCell>{source.fetchInterval}s</TableCell>
