@@ -121,7 +121,7 @@ async function generateProxyFiles(): Promise<void> {
   
   // Write proxy file only if there's content
   if (content.trim()) {
-    await fs.writeFile(path.join(proxyDir, "proxy_categories.txt"), content, "utf-8");
+    await fs.writeFile(path.join(proxyDir, "proxy_feed.txt"), content, "utf-8");
   }
 }
 
