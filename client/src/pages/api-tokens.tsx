@@ -160,7 +160,7 @@ export default function ApiTokensPage() {
         <div>
           <h1 className="text-3xl font-bold">API Tokens</h1>
           <p className="text-muted-foreground">
-            Generate and manage API tokens for programmatic access to the threat intelligence platform
+            Generate and manage API tokens for programmatic access to the The BlackList platform
           </p>
         </div>
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

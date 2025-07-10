@@ -72,7 +72,7 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
         
         const response = await fetch(source.url, {
           headers: {
-            'User-Agent': 'ThreatIntel-Platform/1.0',
+            'User-Agent': 'TheBlackList-Platform/1.0',
             'Accept': 'text/plain, */*',
             'Connection': 'close',
             'Cache-Control': 'no-cache',

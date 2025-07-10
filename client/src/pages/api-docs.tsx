@@ -358,7 +358,7 @@ export default function ApiDocsPage() {
       <div>
         <h1 className="text-3xl font-bold">API Documentation</h1>
         <p className="text-muted-foreground">
-          Comprehensive API documentation for programmatic access to the threat intelligence platform
+          Comprehensive API documentation for programmatic access to the The BlackList platform
         </p>
       </div>
 

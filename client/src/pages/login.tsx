@@ -26,7 +26,7 @@ export default function Login() {
       await login(username, password, authType);
       toast({
         title: "Login successful",
-        description: "Welcome to ThreatIntel Platform",
+        description: "Welcome to The BlackList Platform",
       });
     } catch (error) {
       toast({
