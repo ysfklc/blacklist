@@ -203,7 +203,8 @@ export default function AuditLogs() {
         {/* Audit Logs Table */}
         <Card className="mt-6">
           <CardContent className="p-0">
-            <Table>
+            <div className="overflow-x-auto">
+              <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
                   <TableHead>Timestamp</TableHead>
@@ -255,6 +256,7 @@ export default function AuditLogs() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 

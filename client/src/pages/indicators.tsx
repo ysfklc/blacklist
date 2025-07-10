@@ -292,7 +292,7 @@ export default function Indicators() {
       case "url":
         return "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800";
       case "soar-url":
-        return "bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800";   
+        return "bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800";
       default:
         return "bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-800";
     }
@@ -491,7 +491,8 @@ export default function Indicators() {
         {/* Indicators Table */}
         <Card className="mt-6">
           <CardContent className="p-0">
-            <Table>
+            <div className="overflow-x-auto">
+              <Table className="min-w-full">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
@@ -501,7 +502,7 @@ export default function Indicators() {
                       aria-label="Select all indicators"
                     />
                   </TableHead>
-                  <TableHead>Indicator</TableHead>
+                  <TableHead className="w-1/4 max-w-xs">Indicator</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Status</TableHead>
@@ -528,7 +529,11 @@ export default function Indicators() {
                           aria-label={`Select indicator ${indicator.value}`}
                         />
                       </TableCell>
-                      <TableCell className="font-mono text-sm">{indicator.value}</TableCell>
+                      <TableCell className="font-mono text-sm max-w-xs">
+                        <div className="truncate" title={indicator.value}>
+                          {indicator.value}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={getTypeColor(indicator.type)}>
                           {indicator.type.toUpperCase()}
@@ -623,6 +628,7 @@ export default function Indicators() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
