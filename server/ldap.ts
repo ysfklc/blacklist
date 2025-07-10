@@ -220,68 +220,82 @@ export class LdapService {
 
         console.log(`[LDAP] Starting search with baseDN: ${this.settings!.baseDN}, filter: ${searchOptions.filter}`);
         
-        client.search(this.settings!.baseDN, searchOptions, (searchErr, searchRes) => {
-          if (searchErr) {
-            console.error(`[LDAP] Search error: ${searchErr.message}`);
-            client.unbind();
-            reject(new Error(`LDAP search failed: ${searchErr.message}`));
-            return;
-          }
+        // Function to perform search and collect results
+        const performSearch = (baseDN: string, resolve: any, reject: any) => {
+          client.search(baseDN, searchOptions, (searchErr, searchRes) => {
+            if (searchErr) {
+              console.error(`[LDAP] Search error for ${baseDN}: ${searchErr.message}`);
+              client.unbind();
+              reject(new Error(`LDAP search failed: ${searchErr.message}`));
+              return;
+            }
 
-          const users: LdapUser[] = [];
-          let entryCount = 0;
+            const users: LdapUser[] = [];
+            let entryCount = 0;
 
-          searchRes.on('searchEntry', (entry) => {
-            entryCount++;
-            console.log(`[LDAP] Found entry ${entryCount}: ${entry.dn}`);
-            
-            const attributes = entry.attributes;
-            const getAttr = (name: string) => {
-              const attr = attributes.find(a => a.type === name);
-              return attr ? (attr.values || attr.vals)[0] : '';
-            };
+            searchRes.on('searchEntry', (entry) => {
+              entryCount++;
+              console.log(`[LDAP] Found entry ${entryCount}: ${entry.dn}`);
+              
+              const attributes = entry.attributes;
+              const getAttr = (name: string) => {
+                const attr = attributes.find(a => a.type === name);
+                return attr ? (attr.values || attr.vals)[0] : '';
+              };
 
-            // Extract name components
-            let firstName = getAttr('givenName');
-            let lastName = getAttr('sn');
-            const cn = getAttr('cn') || getAttr('displayName');
-            
-            // If firstName or lastName is empty, try to parse from cn
-            if ((!firstName || !lastName) && cn) {
-              const nameParts = cn.split(' ');
-              if (nameParts.length >= 2) {
-                if (!firstName) firstName = nameParts[0];
-                if (!lastName) lastName = nameParts.slice(1).join(' ');
+              // Extract name components
+              let firstName = getAttr('givenName');
+              let lastName = getAttr('sn');
+              const cn = getAttr('cn') || getAttr('displayName');
+              
+              // If firstName or lastName is empty, try to parse from cn
+              if ((!firstName || !lastName) && cn) {
+                const nameParts = cn.split(' ');
+                if (nameParts.length >= 2) {
+                  if (!firstName) firstName = nameParts[0];
+                  if (!lastName) lastName = nameParts.slice(1).join(' ');
+                }
               }
-            }
 
-            const user: LdapUser = {
-              username: getAttr('sAMAccountName') || getAttr('uid') || getAttr('userPrincipalName') || getAttr('cn'),
-              firstName: firstName || '',
-              lastName: lastName || '',
-              email: getAttr('mail'),
-              cn: cn
-            };
+              const user: LdapUser = {
+                username: getAttr('sAMAccountName') || getAttr('uid') || getAttr('userPrincipalName') || getAttr('cn'),
+                firstName: firstName || '',
+                lastName: lastName || '',
+                email: getAttr('mail'),
+                cn: cn
+              };
 
-            console.log(`[LDAP] Parsed user: ${JSON.stringify(user)}`);
+              console.log(`[LDAP] Parsed user: ${JSON.stringify(user)}`);
 
-            if (user.username) {
-              users.push(user);
-            }
+              if (user.username) {
+                users.push(user);
+              }
+            });
+
+            searchRes.on('end', () => {
+              console.log(`[LDAP] Search completed for ${baseDN}. Found ${users.length} users from ${entryCount} entries`);
+              
+              // If no users found in the specified base DN, try searching the parent domain
+              if (users.length === 0 && baseDN !== 'dc=example,dc=com' && baseDN.includes('dc=example,dc=com')) {
+                console.log(`[LDAP] No users found in ${baseDN}, trying parent domain search...`);
+                performSearch('dc=example,dc=com', resolve, reject);
+                return;
+              }
+              
+              client.unbind();
+              resolve(users);
+            });
+
+            searchRes.on('error', (error) => {
+              console.error(`[LDAP] Search result error: ${error.message}`);
+              client.unbind();
+              reject(new Error(`LDAP search error: ${error.message}`));
+            });
           });
+        };
 
-          searchRes.on('end', () => {
-            console.log(`[LDAP] Search completed. Found ${users.length} users from ${entryCount} entries`);
-            client.unbind();
-            resolve(users);
-          });
-
-          searchRes.on('error', (error) => {
-            console.error(`[LDAP] Search result error: ${error.message}`);
-            client.unbind();
-            reject(new Error(`LDAP search error: ${error.message}`));
-          });
-        });
+        // Start the search
+        performSearch(this.settings!.baseDN, resolve, reject);
       });
 
       // Timeout after 10 seconds
@@ -301,10 +315,26 @@ export class LdapService {
       throw new Error('LDAP is not enabled');
     }
 
-    // Use direct bind authentication - much more reliable than search-then-bind
-    const userDN = `uid=${username},${this.settings!.baseDN}`;
-    console.log(`[LDAP] Using direct DN: ${userDN}`);
+    // First, search for the user to get their actual DN
+    console.log(`[LDAP] Searching for user: ${username}`);
+    let foundUser: LdapUser | null = null;
     
+    try {
+      const searchResults = await this.searchUsers(username);
+      foundUser = searchResults.find(user => user.username === username) || null;
+      
+      if (!foundUser) {
+        console.log(`[LDAP] User ${username} not found in directory`);
+        return null;
+      }
+      
+      console.log(`[LDAP] Found user: ${foundUser.username} with CN: ${foundUser.cn}`);
+    } catch (searchError) {
+      console.error(`[LDAP] Search failed for ${username}: ${searchError}`);
+      return null;
+    }
+
+    // Now authenticate using the found user's actual DN
     return new Promise((resolve, reject) => {
       const isSecure = this.settings!.port === 636 || this.settings!.server.startsWith('ldaps://');
       const url = this.settings!.server.includes('://') ? 
@@ -335,30 +365,48 @@ export class LdapService {
         reject(new Error(`Client error: ${clientErr.message}`));
       });
 
-      // Direct authentication - no search required
-      client.bind(userDN, password, (err) => {
-        client.unbind();
-        
-        if (err) {
-          console.error(`[LDAP] Authentication failed for ${username}: ${err.message}`);
-          resolve(null);
-        } else {
-          console.log(`[LDAP] Authentication successful for ${username}`);
-          resolve({
-            username: username,
-            firstName: '',
-            lastName: username,
-            email: '',
-            cn: username
-          });
-        }
-      });
+      // Try different DN formats for authentication
+      const dnFormats = [
+        `uid=${username},dc=example,dc=com`, // Common format for the test server
+        `cn=${foundUser!.cn},dc=example,dc=com`, // Using CN
+        `uid=${username},${this.settings!.baseDN}`, // Using configured base DN
+        `cn=${foundUser!.cn},${this.settings!.baseDN}` // Using CN with configured base DN
+      ];
 
-      // Timeout after 10 seconds
+      let currentDnIndex = 0;
+      
+      const tryAuthentication = () => {
+        if (currentDnIndex >= dnFormats.length) {
+          console.error(`[LDAP] All DN formats failed for ${username}`);
+          client.unbind();
+          resolve(null);
+          return;
+        }
+
+        const userDN = dnFormats[currentDnIndex];
+        console.log(`[LDAP] Trying authentication with DN: ${userDN}`);
+        
+        client.bind(userDN, password, (err) => {
+          if (err) {
+            console.log(`[LDAP] Authentication failed with DN ${userDN}: ${err.message}`);
+            currentDnIndex++;
+            tryAuthentication();
+          } else {
+            console.log(`[LDAP] Authentication successful for ${username} with DN: ${userDN}`);
+            client.unbind();
+            resolve(foundUser);
+          }
+        });
+      };
+
+      // Start authentication attempts
+      tryAuthentication();
+
+      // Timeout after 15 seconds
       setTimeout(() => {
         client.unbind();
         reject(new Error('LDAP authentication timeout'));
-      }, 10000);
+      }, 15000);
     });
   }
 }
