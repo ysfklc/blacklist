@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Copy } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -116,6 +116,21 @@ export default function Whitelist() {
     if (confirm("Are you sure you want to remove this entry from the whitelist?")) {
       deleteMutation.mutate(id);
     }
+  };
+
+  const handleCopy = (value: string) => {
+    navigator.clipboard.writeText(value).then(() => {
+      toast({
+        title: "Copied",
+        description: "Value copied to clipboard",
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      });
+    });
   };
 
   // Multi-select functionality
@@ -329,7 +344,7 @@ export default function Whitelist() {
                   </TableRow>
                 ) : (
                   whitelist?.map((entry) => (
-                    <TableRow key={entry.id}>
+                    <TableRow key={entry.id} className="group">
                       {canDelete && (
                         <TableCell>
                           <Checkbox
@@ -338,7 +353,19 @@ export default function Whitelist() {
                           />
                         </TableCell>
                       )}
-                      <TableCell className="font-mono text-sm">{entry.value}</TableCell>
+                      <TableCell className="font-mono text-sm">
+                        <div className="flex items-center space-x-2">
+                          <span>{entry.value}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopy(entry.value)}
+                            className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={getTypeColor(entry.type)}>
                           {entry.type.toUpperCase()}
