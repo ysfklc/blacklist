@@ -63,11 +63,36 @@ export class LdapService {
 
     return new Promise((resolve) => {
       try {
-        const client = ldapjs.createClient({
-          url: `${settingsToUse!.server}:${settingsToUse!.port}`,
-          tlsOptions: settingsToUse!.trustAllCertificates ? {
-            rejectUnauthorized: false
-          } : undefined
+        const isSecure = settingsToUse!.port === 636 || settingsToUse!.server.startsWith('ldaps://');
+        const url = settingsToUse!.server.includes('://') ? 
+          `${settingsToUse!.server}:${settingsToUse!.port}` : 
+          `${isSecure ? 'ldaps' : 'ldap'}://${settingsToUse!.server}:${settingsToUse!.port}`;
+        
+        const clientOptions: any = {
+          url: url,
+          timeout: 10000,
+          connectTimeout: 10000,
+        };
+        
+        if (isSecure) {
+          clientOptions.tlsOptions = {
+            rejectUnauthorized: !settingsToUse!.trustAllCertificates,
+            // Remove conflicting TLS settings - let Node.js handle the protocol negotiation
+            ...(settingsToUse!.trustAllCertificates ? {
+              checkServerIdentity: () => undefined // Skip hostname verification when trusting all certs
+            } : {})
+          };
+        }
+        
+        const client = ldapjs.createClient(clientOptions);
+
+        // Add error handler to catch SSL/TLS errors
+        client.on('error', (clientErr) => {
+          console.error('LDAP client error:', clientErr);
+          resolve({
+            success: false,
+            message: `Client error: ${clientErr.message}`
+          });
         });
 
         client.bind(settingsToUse!.bindDN, settingsToUse!.password, (err) => {
@@ -146,11 +171,33 @@ export class LdapService {
     // ldapjs is now statically imported
 
     return new Promise((resolve, reject) => {
-      const client = ldapjs.createClient({
-        url: `${this.settings!.server}:${this.settings!.port}`,
-        tlsOptions: this.settings!.trustAllCertificates ? {
-          rejectUnauthorized: false
-        } : undefined
+      const isSecure = this.settings!.port === 636 || this.settings!.server.startsWith('ldaps://');
+      const url = this.settings!.server.includes('://') ? 
+        `${this.settings!.server}:${this.settings!.port}` : 
+        `${isSecure ? 'ldaps' : 'ldap'}://${this.settings!.server}:${this.settings!.port}`;
+      
+      const clientOptions: any = {
+        url: url,
+        timeout: 10000,
+        connectTimeout: 10000,
+      };
+      
+      if (isSecure) {
+        clientOptions.tlsOptions = {
+          rejectUnauthorized: !this.settings!.trustAllCertificates,
+          // Remove conflicting TLS settings - let Node.js handle the protocol negotiation
+          ...(this.settings!.trustAllCertificates ? {
+            checkServerIdentity: () => undefined // Skip hostname verification when trusting all certs
+          } : {})
+        };
+      }
+      
+      const client = ldapjs.createClient(clientOptions);
+
+      // Add error handler to catch SSL/TLS errors
+      client.on('error', (clientErr) => {
+        console.error('LDAP client error:', clientErr);
+        reject(new Error(`Client error: ${clientErr.message}`));
       });
 
       client.bind(this.settings!.bindDN, this.settings!.password, (err) => {
@@ -171,9 +218,9 @@ export class LdapService {
           searchOptions.filter = `(&(|(objectClass=user)(objectClass=person)(objectClass=inetOrgPerson))(|(cn=*${query}*)(sAMAccountName=*${query}*)(uid=*${query}*)(mail=*${query}*)(displayName=*${query}*)))`;
         }
 
-        console.log(`[LDAP] Starting search with baseDN: dc=example,dc=com, filter: ${searchOptions.filter}`);
+        console.log(`[LDAP] Starting search with baseDN: ${this.settings!.baseDN}, filter: ${searchOptions.filter}`);
         
-        client.search('dc=example,dc=com', searchOptions, (searchErr, searchRes) => {
+        client.search(this.settings!.baseDN, searchOptions, (searchErr, searchRes) => {
           if (searchErr) {
             console.error(`[LDAP] Search error: ${searchErr.message}`);
             client.unbind();
@@ -255,15 +302,37 @@ export class LdapService {
     }
 
     // Use direct bind authentication - much more reliable than search-then-bind
-    const userDN = `uid=${username},dc=example,dc=com`;
+    const userDN = `uid=${username},${this.settings!.baseDN}`;
     console.log(`[LDAP] Using direct DN: ${userDN}`);
     
     return new Promise((resolve, reject) => {
-      const client = ldapjs.createClient({
-        url: `${this.settings!.server}:${this.settings!.port}`,
-        tlsOptions: this.settings!.trustAllCertificates ? {
-          rejectUnauthorized: false
-        } : undefined
+      const isSecure = this.settings!.port === 636 || this.settings!.server.startsWith('ldaps://');
+      const url = this.settings!.server.includes('://') ? 
+        `${this.settings!.server}:${this.settings!.port}` : 
+        `${isSecure ? 'ldaps' : 'ldap'}://${this.settings!.server}:${this.settings!.port}`;
+      
+      const clientOptions: any = {
+        url: url,
+        timeout: 10000,
+        connectTimeout: 10000,
+      };
+      
+      if (isSecure) {
+        clientOptions.tlsOptions = {
+          rejectUnauthorized: !this.settings!.trustAllCertificates,
+          // Remove conflicting TLS settings - let Node.js handle the protocol negotiation
+          ...(this.settings!.trustAllCertificates ? {
+            checkServerIdentity: () => undefined // Skip hostname verification when trusting all certs
+          } : {})
+        };
+      }
+      
+      const client = ldapjs.createClient(clientOptions);
+
+      // Add error handler to catch SSL/TLS errors
+      client.on('error', (clientErr) => {
+        console.error('LDAP client error:', clientErr);
+        reject(new Error(`Client error: ${clientErr.message}`));
       });
 
       // Direct authentication - no search required
