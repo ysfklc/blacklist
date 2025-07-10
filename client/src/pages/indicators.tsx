@@ -114,6 +114,13 @@ export default function Indicators() {
     },
   });
 
+  const { data: settings } = useQuery<any[]>({
+    queryKey: ["/api/settings"],
+  });
+
+  // Check if SOAR-URL is enabled
+  const isSoarUrlEnabled = settings?.find(s => s.key === "system.enableSoarUrl")?.value === "true";
+
   const form = useForm<IndicatorFormData>({
     resolver: zodResolver(indicatorSchema),
     defaultValues: {
@@ -284,6 +291,8 @@ export default function Indicators() {
         return "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800";
       case "url":
         return "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800";
+      case "soar-url":
+        return "bg-purple-50 text-purple-700 border border-purple-200 dark:bg-purple-900/20 dark:text-purple-400 dark:border-purple-800";   
       default:
         return "bg-slate-50 text-slate-700 border border-slate-200 dark:bg-slate-900/20 dark:text-slate-400 dark:border-slate-800";
     }
@@ -381,6 +390,9 @@ export default function Indicators() {
                     <SelectItem value="domain">Domain</SelectItem>
                     <SelectItem value="hash">Hash</SelectItem>
                     <SelectItem value="url">URL</SelectItem>
+                    {isSoarUrlEnabled && (
+                      <SelectItem value="soar-url">SOAR-URL</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>

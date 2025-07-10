@@ -239,6 +239,7 @@ export class DatabaseStorage implements IStorage {
         domain: indicatorTypeMap.domain || 0,
         hash: indicatorTypeMap.hash || 0,
         url: indicatorTypeMap.url || 0,
+        "soar-url": indicatorTypeMap["soar-url"] || 0,
       },
       recentActivity: recentActivity.map(log => ({
         id: log.id,

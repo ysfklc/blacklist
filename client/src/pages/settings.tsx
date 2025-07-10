@@ -39,6 +39,7 @@ export default function Settings() {
     logRetention: 90,
     blacklistUpdateInterval: 300,
     apiDocsAllowedIPs: "",
+    enableSoarUrl: false,
   });
 
   const [proxySettings, setProxySettings] = useState({
@@ -87,6 +88,7 @@ export default function Settings() {
         logRetention: parseInt(settingsMap["system.logRetention"] || "90"),
         blacklistUpdateInterval: parseInt(settingsMap["system.blacklistUpdateInterval"] || "300"),
         apiDocsAllowedIPs: settingsMap["system.apiDocsAllowedIPs"] || "",
+        enableSoarUrl: settingsMap["system.enableSoarUrl"] === "true",
       });
 
       // Update proxy settings
@@ -151,6 +153,7 @@ export default function Settings() {
       "system.logRetention": systemSettings.logRetention.toString(),
       "system.blacklistUpdateInterval": systemSettings.blacklistUpdateInterval.toString(),
       "system.apiDocsAllowedIPs": systemSettings.apiDocsAllowedIPs || "",
+      "system.enableSoarUrl": systemSettings.enableSoarUrl.toString(),
     }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
@@ -433,6 +436,22 @@ export default function Settings() {
                   />
                 </div>
               </div>
+
+              {/* SOAR-URL Indicator Type Toggle */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="enable-soar-url">Enable SOAR-URL indicator type?</Label>
+                  <p className="text-sm text-gray-500">
+                    Allow SOAR-URL as an indicator type in data sources with no regex filtering
+                  </p>
+                </div>
+                <Switch
+                  id="enable-soar-url"
+                  checked={systemSettings.enableSoarUrl}
+                  onCheckedChange={(checked) => setSystemSettings({ ...systemSettings, enableSoarUrl: checked })}
+                />
+              </div>
+
               <div className="flex justify-end">
                 <Button
                   type="submit"

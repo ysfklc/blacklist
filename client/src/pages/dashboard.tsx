@@ -13,6 +13,7 @@ interface DashboardStats {
     domain: number;
     hash: number;
     url: number;
+    "soar-url": number;
   };
   recentActivity: Array<{
     id: number;
@@ -37,6 +38,12 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard/stats"],
   });
 
+   const { data: settings } = useQuery<any[]>({
+    queryKey: ["/api/settings"],
+  });
+
+  // Check if SOAR-URL is enabled
+  const isSoarUrlEnabled = settings?.find(s => s.key === "system.enableSoarUrl")?.value === "true";
   const canViewRecentActivity = user?.role !== "reporter";
   const isUserRole = user?.role === "user";
 
@@ -176,6 +183,17 @@ export default function Dashboard() {
                     {stats.indicatorsByType.url.toLocaleString()}
                   </span>
                 </div>
+                {isSoarUrlEnabled && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="h-3 w-3 bg-purple-500 rounded-full mr-2"></div>
+                      <span className="text-sm text-gray-600">SOAR-URLs</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {stats.indicatorsByType["soar-url"].toLocaleString()}
+                    </span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

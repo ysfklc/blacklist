@@ -21,7 +21,7 @@ export const dataSources = pgTable("data_sources", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   url: text("url").notNull(),
-  indicatorTypes: text("indicator_types").array().notNull(), // array of: ip, domain, hash, url
+  indicatorTypes: text("indicator_types").array().notNull(), // array of: ip, domain, hash, url, soar-url
   fetchInterval: integer("fetch_interval").notNull().default(3600), // seconds
   isActive: boolean("is_active").notNull().default(true),
   isPaused: boolean("is_paused").notNull().default(false),
@@ -35,7 +35,7 @@ export const dataSources = pgTable("data_sources", {
 export const indicators = pgTable("indicators", {
   id: serial("id").primaryKey(),
   value: text("value").notNull().unique(),
-  type: text("type").notNull(), // ip, domain, hash, url
+  type: text("type").notNull(), // ip, domain, hash, url, soar-url
   hashType: text("hash_type"), // md5, sha1, sha256, sha512 (for hash type only)
   source: text("source").notNull(),
   sourceId: integer("source_id").references(() => dataSources.id),
@@ -49,7 +49,7 @@ export const indicators = pgTable("indicators", {
 export const whitelist = pgTable("whitelist", {
   id: serial("id").primaryKey(),
   value: text("value").notNull().unique(),
-  type: text("type").notNull(), // ip, domain, hash, url
+  type: text("type").notNull(), // ip, domain, hash, url, soar-url
   reason: text("reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: integer("created_by").references(() => users.id),

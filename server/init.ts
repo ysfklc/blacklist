@@ -56,6 +56,11 @@ export async function initializeDatabase(): Promise<void> {
       { key: "proxyFormat.urlCategory", value: "blocked_urls" }
     ];
     
+    // Initialize SOAR-URL setting if it doesn't exist
+    const soarUrlSetting = [
+      { key: "system.enableSoarUrl", value: "false" }
+    ];
+
     for (const setting of proxyFormatSettings) {
       const existing = await db
         .select()
@@ -72,7 +77,24 @@ export async function initializeDatabase(): Promise<void> {
       }
     }
     
-    console.log("Proxy format settings initialized");
+        // Initialize SOAR-URL setting
+    for (const setting of soarUrlSetting) {
+      const existing = await db
+        .select()
+        .from(settings)
+        .where(eq(settings.key, setting.key))
+        .limit(1);
+      
+      if (existing.length === 0) {
+        await db.insert(settings).values({
+          key: setting.key,
+          value: setting.value,
+          encrypted: false,
+        });
+      }
+    }
+    
+    console.log("Proxy format and SOAR-URL settings initialized");
     console.log("Database initialization complete");
     
   } catch (error) {

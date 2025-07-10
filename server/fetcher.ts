@@ -8,6 +8,7 @@ interface ParsedIndicators {
   domains: string[];
   hashes: string[];
   urls: string[];
+  soarUrls: string[];
 }
 
 const IP_REGEX = /(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/g;
@@ -93,8 +94,8 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
         console.log(`[FETCH] Fetched ${data.length} characters from ${source.name}`);
         
         // Parse data immediately
-        const parsed = parseData(data);
-        console.log(`[FETCH] Parsed indicators: IPs=${parsed.ips.length}, Domains=${parsed.domains.length}, Hashes=${parsed.hashes.length}, URLs=${parsed.urls.length}`);
+        const parsed = parseData(data, source);
+        console.log(`[FETCH] Parsed indicators: IPs=${parsed.ips.length}, Domains=${parsed.domains.length}, Hashes=${parsed.hashes.length}, URLs=${parsed.urls.length}, SOAR-URLs=${parsed.soarUrls.length}`);
         
         // Update source status to indicate fetch is complete, processing started
         await storage.updateDataSourceStatus(source.id, "processing", null);
@@ -149,6 +150,9 @@ async function processAllIndicators(source: DataSource, parsed: ParsedIndicators
       case "url":
         indicators = parsed.urls;
         break;
+      case "soar-url":
+        indicators = parsed.soarUrls;
+        break;   
     }
     
     if (indicators.length > 0) {
@@ -303,13 +307,23 @@ async function processIndicatorsInBackground(source: DataSource, indicators: str
   }
 }
 
-function parseData(data: string): ParsedIndicators {
+function parseData(data: string, source: DataSource): ParsedIndicators {
   const ips = Array.from(new Set(data.match(IP_REGEX) || []));
   const domains = Array.from(new Set(data.match(DOMAIN_REGEX) || []));
   const hashes = Array.from(new Set(data.match(HASH_REGEX) || []));
   const urls = Array.from(new Set(data.match(URL_REGEX) || []));
 
-  return { ips, domains, hashes, urls };
+  // For SOAR-URL type, process line by line without regex filtering or deduplication
+  let soarUrls: string[] = [];
+  if (source.indicatorTypes.includes('soar-url')) {
+    const lines = data.split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && !line.startsWith('#') && !line.startsWith('//'));
+    soarUrls = lines;
+    console.log(`[FETCH] SOAR-URL processing: ${lines.length} lines found (first 5): ${lines.slice(0, 5).join(', ')}`);
+  }
+
+  return { ips, domains, hashes, urls, soarUrls };
 }
 
 function detectHashType(hash: string): string {

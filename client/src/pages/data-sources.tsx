@@ -20,7 +20,7 @@ import { useAuth } from "@/hooks/use-auth";
 const dataSourceSchema = z.object({
   name: z.string().min(1, "Name is required"),
   url: z.string().url("Invalid URL"),
-  indicatorTypes: z.array(z.enum(["ip", "domain", "hash", "url"])).min(1, "At least one indicator type is required"),
+  indicatorTypes: z.array(z.enum(["ip", "domain", "hash", "url", "soar-url"])).min(1, "At least one indicator type is required"),
   fetchInterval: z.number().min(60, "Minimum interval is 60 seconds"),
 });
 
@@ -49,6 +49,19 @@ export default function DataSources() {
   const { data: dataSources, isLoading } = useQuery<DataSource[]>({
     queryKey: ["/api/data-sources"],
   });
+
+  const { data: settings } = useQuery<any[]>({
+    queryKey: ["/api/settings"],
+  });
+
+  // Check if SOAR-URL is enabled
+  const isSoarUrlEnabled = settings?.find(s => s.key === "system.enableSoarUrl")?.value === "true";
+
+  // Get available indicator types based on settings
+  const getAvailableIndicatorTypes = () => {
+    const baseTypes = ["ip", "domain", "hash", "url"] as const;
+    return isSoarUrlEnabled ? [...baseTypes, "soar-url" as const] : baseTypes;
+  };
 
   const form = useForm<DataSourceFormData>({
     resolver: zodResolver(dataSourceSchema),
@@ -268,7 +281,7 @@ export default function DataSources() {
                           <FormItem>
                             <FormLabel>Indicator Types</FormLabel>
                             <div className="space-y-2">
-                              {(["ip", "domain", "hash", "url"] as const).map((type) => (
+                              {getAvailableIndicatorTypes().map((type) => (
                                 <FormField
                                   key={type}
                                   control={form.control}
@@ -291,7 +304,8 @@ export default function DataSources() {
                                         <FormLabel className="font-normal capitalize">
                                           {type === "ip" ? "IP Address" : 
                                            type === "domain" ? "Domain" :
-                                           type === "hash" ? "Hash" : "URL"}
+                                           type === "hash" ? "Hash" : 
+                                           type === "url" ? "URL" : "SOAR-URL"}
                                         </FormLabel>
                                       </FormItem>
                                     )
@@ -545,7 +559,7 @@ export default function DataSources() {
                     <FormItem>
                       <FormLabel>Indicator Types</FormLabel>
                       <div className="space-y-2">
-                        {(["ip", "domain", "hash", "url"] as const).map((type) => (
+                        {getAvailableIndicatorTypes().map((type) => (
                           <FormField
                             key={type}
                             control={form.control}

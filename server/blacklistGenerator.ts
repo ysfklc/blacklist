@@ -81,7 +81,8 @@ async function generateProxyFiles(): Promise<void> {
   
   const domainIndicators = await storage.getActiveIndicatorsByType("domain");
   const urlIndicators = await storage.getActiveIndicatorsByType("url");
-  
+  const soarUrlIndicators = await storage.getActiveIndicatorsByType("soar-url");
+
   const proxyDir = path.join(BLACKLIST_DIR, "Proxy");
   
   // Clear existing proxy files
@@ -108,10 +109,11 @@ async function generateProxyFiles(): Promise<void> {
     content += "end\n\n";
   }
   
-  // Add URL category
-  if (urlIndicators.length > 0 && urlCategory) {
+  // Add URL category (includes both URL and SOAR-URL indicators)
+  const allUrlIndicators = [...urlIndicators, ...soarUrlIndicators];
+  if (allUrlIndicators.length > 0 && urlCategory) {
     content += `define category ${urlCategory}\n`;
-    for (const indicator of urlIndicators) {
+    for (const indicator of allUrlIndicators) {
       content += `  "${indicator.value}"\n`;
     }
     content += "end\n\n";
