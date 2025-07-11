@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Trash2, Edit, Plus, Eye, Lock } from "lucide-react";
+import { Trash2, Edit, Plus, Eye, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -98,6 +98,8 @@ export default function Users() {
   const [showLdapSearch, setShowLdapSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const isAdmin = user?.role === "admin";
 
@@ -122,7 +124,7 @@ export default function Users() {
   const allUsers: SystemUser[] = isAdmin ? (users || []) : (users ? [users] : []);
   
   // Filter users based on search query and role filter
-  const userList = allUsers.filter((user) => {
+  const filteredUsers = allUsers.filter((user) => {
     const matchesSearch = !searchQuery || 
       user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (user.firstName && user.firstName.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -134,6 +136,18 @@ export default function Users() {
     return matchesSearch && matchesRole;
   });
 
+  // Pagination calculations
+  const totalUsers = filteredUsers.length;
+  const totalPages = Math.ceil(totalUsers / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const userList = filteredUsers.slice(startIndex, endIndex);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter, pageSize]);
+
   const createUserMutation = useMutation({
     mutationFn: (data: UserFormData) => apiRequest("POST", "/api/users", data),
     onSuccess: () => {
@@ -141,6 +155,8 @@ export default function Users() {
       setShowCreateDialog(false);
       createForm.reset();
       setSelectedLdapUser(null);
+      setLdapResults([]);
+      setLdapSearchQuery("");
       setShowLdapSearch(false);
       toast({ title: "User created successfully" });
     },
@@ -274,6 +290,8 @@ export default function Users() {
         isActive: true,
       });
       setSelectedLdapUser(null);
+      setLdapResults([]);
+      setLdapSearchQuery("");
       setShowLdapSearch(false);
     }
   }, [showCreateDialog]);
@@ -337,6 +355,8 @@ export default function Users() {
     } else {
       setShowLdapSearch(false);
       setSelectedLdapUser(null);
+      setLdapResults([]);
+      setLdapSearchQuery("");
     }
   };
 
@@ -517,16 +537,18 @@ export default function Users() {
                         {ldapResults.length > 0 && (
                           <div className="space-y-2">
                             <Label>Search Results</Label>
-                            {ldapResults.map((result, index) => (
-                              <div
-                                key={index}
-                                className="p-3 border rounded cursor-pointer hover:bg-gray-100"
-                                onClick={() => handleLdapUserSelect(result)}
-                              >
-                                <div className="font-medium">{result.cn}</div>
-                                <div className="text-sm text-gray-600">{result.username} • {result.email}</div>
-                              </div>
-                            ))}
+                            <div className="max-h-60 overflow-y-auto space-y-2 border rounded p-2 bg-white">
+                              {ldapResults.map((result, index) => (
+                                <div
+                                  key={index}
+                                  className="p-3 border rounded cursor-pointer hover:bg-gray-100"
+                                  onClick={() => handleLdapUserSelect(result)}
+                                >
+                                  <div className="font-medium">{result.cn}</div>
+                                  <div className="text-sm text-gray-600">{result.username} • {result.email}</div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
 
@@ -691,89 +713,186 @@ export default function Users() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {userList.map((user: SystemUser) => (
-              <TableRow key={user.id}>
-                <TableCell className="font-medium">
-                  <div className="flex items-center space-x-3">
-                    <UserAvatar user={user} size="sm" />
-                    <span>{user.username}</span>
-                  </div>
+            {userList.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8 text-muted-foreground">
+                  No users found matching your search criteria.
                 </TableCell>
-                <TableCell>
-                  {user.firstName || user.lastName 
-                    ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
-                    : '-'
-                  }
-                </TableCell>
-                <TableCell>{user.email || '-'}</TableCell>
-                <TableCell>
-                  <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                    {user.role}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{user.authType}</Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={user.isActive ? "default" : "secondary"} className={user.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
-                    {user.isActive ? "Active" : "Inactive"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {new Date(user.createdAt).toLocaleDateString()}
-                </TableCell>
-                {isAdmin && (
+              </TableRow>
+            ) : (
+              userList.map((user: SystemUser) => (
+                <TableRow key={user.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center space-x-3">
+                      <UserAvatar user={user} size="sm" />
+                      <span>{user.username}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(user)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {user.authType === "local" && (
+                    {user.firstName || user.lastName 
+                      ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                      : '-'
+                    }
+                  </TableCell>
+                  <TableCell>{user.email || '-'}</TableCell>
+                  <TableCell>
+                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                      {user.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{user.authType}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={user.isActive ? "default" : "secondary"} className={user.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
+                      {user.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {new Date(user.createdAt).toLocaleDateString()}
+                  </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setShowAdminPasswordDialog(true);
-                          }}
+                          onClick={() => handleEdit(user)}
                         >
-                          <Lock className="h-4 w-4" />
+                          <Edit className="h-4 w-4" />
                         </Button>
-                      )}
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <Trash2 className="h-4 w-4" />
+                        {user.authType === "local" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setShowAdminPasswordDialog(true);
+                            }}
+                          >
+                            <Lock className="h-4 w-4" />
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This action cannot be undone. This will permanently delete the user
-                              account for "{user.username}".
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => handleDelete(user.id)}>
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
+                        )}
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the user
+                                account for "{user.username}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDelete(user.id)}>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination Controls */}
+      {totalUsers > 0 && (
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <p className="text-sm text-muted-foreground">
+              Showing {startIndex + 1} to {Math.min(endIndex, totalUsers)} of {totalUsers} users
+            </p>
+            <div className="flex items-center space-x-2">
+              <Label htmlFor="page-size">Users per page:</Label>
+              <Select value={pageSize.toString()} onValueChange={(value) => setPageSize(Number(value))}>
+                <SelectTrigger id="page-size" className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="5">5</SelectItem>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="20">20</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                  <SelectItem value="100">100</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNumber;
+                if (totalPages <= 5) {
+                  pageNumber = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNumber = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNumber = totalPages - 4 + i;
+                } else {
+                  pageNumber = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNumber}
+                    variant={currentPage === pageNumber ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNumber)}
+                    className="w-8"
+                  >
+                    {pageNumber}
+                  </Button>
+                );
+              })}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Edit User Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
