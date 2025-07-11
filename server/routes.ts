@@ -1211,20 +1211,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const entry = await storage.createWhitelistEntry(validatedData);
       
-      // Deactivate any existing indicators that match this whitelist entry
-      const deactivatedCount = await storage.deactivateIndicatorsFromWhitelist(entry.value, entry.type);
+      // Delete any existing indicators that match this whitelist entry
+      const deletedCount = await storage.deleteIndicatorsFromWhitelist(entry.value, entry.type);
       
       await storage.createAuditLog({
         level: "info",
         action: "create",
         resource: "whitelist",
         resourceId: entry.id.toString(),
-        details: `Added to whitelist: ${entry.value}${deactivatedCount > 0 ? ` (deactivated ${deactivatedCount} matching indicator${deactivatedCount > 1 ? 's' : ''})` : ''}`,
+        details: `Added to whitelist: ${entry.value}${deletedCount > 0 ? ` (deleted ${deletedCount} matching indicator${deletedCount > 1 ? 's' : ''})` : ''}`,
         userId: req.user.userId,
         ipAddress: req.ip,
       });
 
-      res.status(201).json({ ...entry, deactivatedIndicators: deactivatedCount });
+      res.status(201).json({ ...entry, deletedIndicators: deletedCount });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid data", details: error.errors });
