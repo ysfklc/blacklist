@@ -428,8 +428,20 @@ export default function Whitelist() {
                 </TableHeader>
                 <TableBody>
                   {whitelistBlocks.data.map((block: WhitelistBlock) => (
-                    <TableRow key={block.id}>
-                      <TableCell className="font-mono text-sm">{block.value}</TableCell>
+                    <TableRow key={block.id} className="group">
+                      <TableCell className="font-mono text-sm">
+                        <div className="flex items-center space-x-2">
+                          <span>{block.value}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopy(block.value)}
+                            className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge className={getTypeColor(block.type)}>
                           {block.type.toUpperCase()}

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Download } from "lucide-react";
+import { Download, Copy } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
@@ -91,6 +91,21 @@ export default function AuditLogs() {
   const handlePageSizeChange = (newSize: string) => {
     setPageSize(parseInt(newSize));
     setPage(1); // Reset to first page when changing page size
+  };
+
+  const handleCopyDetails = (details: string) => {
+    navigator.clipboard.writeText(details).then(() => {
+      toast({
+        title: "Copied",
+        description: "Log details copied to clipboard",
+      });
+    }).catch(() => {
+      toast({
+        title: "Error",
+        description: "Failed to copy to clipboard",
+        variant: "destructive",
+      });
+    });
   };
 
   const getLevelColor = (level: string) => {
@@ -225,7 +240,7 @@ export default function AuditLogs() {
                   </TableRow>
                 ) : (
                   logs?.data?.map((log: AuditLog) => (
-                    <TableRow key={log.id}>
+                    <TableRow key={log.id} className="group">
                       <TableCell className="text-sm">
                         {new Date(log.createdAt).toLocaleString()}
                       </TableCell>
@@ -244,8 +259,18 @@ export default function AuditLogs() {
                         {log.resource.replace('_', ' ')}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-sm">
-                        <div className="truncate" title={log.details}>
-                          {log.details}
+                        <div className="flex items-center space-x-2">
+                          <div className="truncate" title={log.details}>
+                            {log.details}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyDetails(log.details)}
+                            className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </Button>
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
