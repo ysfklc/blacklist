@@ -15,6 +15,8 @@ interface DashboardStats {
     url: number;
     "soar-url": number;
   };
+  indicatorsByDataSource: Record<string, number>;
+  indicatorsByDataSourceAndType: Record<string, Record<string, number>>;
   recentActivity: Array<{
     id: number;
     level: string;
@@ -38,12 +40,13 @@ export default function Dashboard() {
     queryKey: ["/api/dashboard/stats"],
   });
 
-   const { data: settings } = useQuery<any[]>({
+  const { data: settings } = useQuery<any[]>({
     queryKey: ["/api/settings"],
   });
 
   // Check if SOAR-URL is enabled
   const isSoarUrlEnabled = settings?.find(s => s.key === "system.enableSoarUrl")?.value === "true";
+
   const canViewRecentActivity = user?.role !== "reporter";
   const isUserRole = user?.role === "user";
 
@@ -138,8 +141,8 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Charts and Recent Activity */}
-        <div className={`grid gap-6 mb-8 ${canViewRecentActivity ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
+        {/* Charts Grid */}
+        <div className={`grid gap-6 mb-8 ${canViewRecentActivity ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1 lg:grid-cols-2'}`}>
           {/* Indicator Types Chart */}
           <Card>
             <CardHeader>
@@ -195,6 +198,80 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Indicators per Data Source Chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Indicators per Data Source</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {Object.keys(stats.indicatorsByDataSource).length === 0 ? (
+                <p className="text-gray-500 text-sm">No indicators from data sources</p>
+              ) : (
+                <div className="max-h-96 overflow-y-auto">
+                  <div className="space-y-4 pr-2">
+                    {Object.entries(stats.indicatorsByDataSource)
+                      .sort(([,a], [,b]) => b - a)
+                      .map(([source, count], index) => {
+                        const colors = [
+                          'bg-blue-500', 'bg-green-500', 'bg-yellow-500', 
+                          'bg-red-500', 'bg-purple-500', 'bg-indigo-500',
+                          'bg-pink-500', 'bg-orange-500', 'bg-teal-500', 'bg-cyan-500'
+                        ];
+                        const color = colors[index % colors.length];
+                        const typeBreakdown = stats.indicatorsByDataSourceAndType[source] || {};
+                        
+                        return (
+                          <div key={source} className="border-b border-gray-100 pb-3 last:border-b-0">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center">
+                                <div className={`h-3 w-3 ${color} rounded-full mr-2`}></div>
+                                <span className="text-sm font-medium text-gray-900 truncate max-w-32">{source}</span>
+                              </div>
+                              <span className="text-sm font-bold text-gray-900">
+                                {count.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="ml-5 space-y-1">
+                              {typeBreakdown.ip && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500">IP Addresses</span>
+                                  <span className="text-gray-700">{typeBreakdown.ip.toLocaleString()}</span>
+                                </div>
+                              )}
+                              {typeBreakdown.domain && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500">Domains</span>
+                                  <span className="text-gray-700">{typeBreakdown.domain.toLocaleString()}</span>
+                                </div>
+                              )}
+                              {typeBreakdown.hash && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500">Hashes</span>
+                                  <span className="text-gray-700">{typeBreakdown.hash.toLocaleString()}</span>
+                                </div>
+                              )}
+                              {typeBreakdown.url && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500">URLs</span>
+                                  <span className="text-gray-700">{typeBreakdown.url.toLocaleString()}</span>
+                                </div>
+                              )}
+                              {isSoarUrlEnabled && typeBreakdown["soar-url"] && (
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-gray-500">SOAR-URLs</span>
+                                  <span className="text-gray-700">{typeBreakdown["soar-url"].toLocaleString()}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

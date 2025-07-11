@@ -206,6 +206,28 @@ export class DatabaseStorage implements IStorage {
       .where(eq(indicators.isActive, true))
       .groupBy(indicators.type);
 
+    // Get indicators count per data source
+    const indicatorsByDataSource = await db
+      .select({
+        source: indicators.source,
+        sourceId: indicators.sourceId,
+        count: count()
+      })
+      .from(indicators)
+      .where(eq(indicators.isActive, true))
+      .groupBy(indicators.source, indicators.sourceId);
+
+    // Get indicators count per data source and type
+    const indicatorsByDataSourceAndType = await db
+      .select({
+        source: indicators.source,
+        type: indicators.type,
+        count: count()
+      })
+      .from(indicators)
+      .where(eq(indicators.isActive, true))
+      .groupBy(indicators.source, indicators.type);
+
     const recentActivity = await db
       .select()
       .from(auditLogs)
@@ -230,6 +252,21 @@ export class DatabaseStorage implements IStorage {
       return acc;
     }, {} as Record<string, number>);
 
+    // Create indicators per data source map
+    const indicatorsByDataSourceMap = indicatorsByDataSource.reduce((acc, item) => {
+      acc[item.source] = (acc[item.source] || 0) + item.count;
+      return acc;
+    }, {} as Record<string, number>);
+
+    // Create indicators per data source and type map
+    const indicatorsByDataSourceAndTypeMap = indicatorsByDataSourceAndType.reduce((acc, item) => {
+      if (!acc[item.source]) {
+        acc[item.source] = {};
+      }
+      acc[item.source][item.type] = item.count;
+      return acc;
+    }, {} as Record<string, Record<string, number>>);
+
     return {
       totalIndicators: totalIndicators.count,
       activeIndicators: activeIndicators.count,
@@ -242,6 +279,8 @@ export class DatabaseStorage implements IStorage {
         url: indicatorTypeMap.url || 0,
         "soar-url": indicatorTypeMap["soar-url"] || 0,
       },
+      indicatorsByDataSource: indicatorsByDataSourceMap,
+      indicatorsByDataSourceAndType: indicatorsByDataSourceAndTypeMap,
       recentActivity: recentActivity.map(log => ({
         id: log.id,
         level: log.level,
