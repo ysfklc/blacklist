@@ -1426,7 +1426,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/settings", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
       const settings = await storage.getSettings();
-      res.json(settings);
+      
+      // Filter out sensitive settings that should not be exposed to the frontend
+      const sensitiveKeys = [
+        'ldap.password',
+        'proxy.password'
+      ];
+      
+      const filteredSettings = settings.filter(setting => 
+        !sensitiveKeys.includes(setting.key)
+      );
+      
+      res.json(filteredSettings);
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });
     }
