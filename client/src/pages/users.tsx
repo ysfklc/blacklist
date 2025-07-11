@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiRequest } from "@/lib/queryClient";
@@ -139,6 +139,9 @@ export default function Users() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
       setShowCreateDialog(false);
+      createForm.reset();
+      setSelectedLdapUser(null);
+      setShowLdapSearch(false);
       toast({ title: "User created successfully" });
     },
     onError: (error: any) => {
@@ -256,6 +259,24 @@ export default function Users() {
       newPassword: "",
     },
   });
+
+  // Reset form when create dialog opens
+  useEffect(() => {
+    if (showCreateDialog) {
+      createForm.reset({
+        username: "",
+        password: "",
+        firstName: "",
+        lastName: "",
+        email: "",
+        role: "user",
+        authType: "local",
+        isActive: true,
+      });
+      setSelectedLdapUser(null);
+      setShowLdapSearch(false);
+    }
+  }, [showCreateDialog]);
 
   const onCreateSubmit = (data: UserFormData) => {
     createUserMutation.mutate(data);
