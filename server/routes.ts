@@ -857,6 +857,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check if an indicator exists
+  app.get("/api/indicator/check", authenticateTokenOrApiKey, async (req, res) => {
+    try {
+      const { value } = req.query;
+      
+      if (!value || typeof value !== 'string') {
+        return res.status(400).json({ 
+          error: "Invalid request", 
+          details: "Indicator value is required and must be a string" 
+        });
+      }
+      
+      const trimmedValue = value.trim();
+      
+      // Try to find the indicator with both case-sensitive and case-insensitive search
+      let indicator = await storage.getIndicatorByValue(trimmedValue);
+      if (!indicator) {
+        indicator = await storage.getIndicatorByValueCaseInsensitive(trimmedValue);
+      }
+      
+      if (indicator) {
+        res.json({
+          exists: true,
+          indicator: {
+            id: indicator.id,
+            value: indicator.value,
+            type: indicator.type,
+            hashType: indicator.hashType,
+            isActive: indicator.isActive,
+            source: indicator.source,
+            tempActiveUntil: indicator.tempActiveUntil,
+            createdAt: indicator.createdAt,
+            createdByUser: indicator.createdByUser
+          }
+        });
+      } else {
+        res.json({
+          exists: false,
+          message: "Record not found"
+        });
+      }
+    } catch (error) {
+      console.error("Error checking indicator:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.post("/api/indicators", authenticateTokenOrApiKey, requireRole(["admin", "user"]), async (req, res) => {
     try {
       const { durationHours, value, notes, ...bodyData } = req.body;

@@ -186,6 +186,17 @@ export default function ApiDocsPage() {
     },
     {
       method: "GET",
+      path: "/api/indicator/check",
+      description: "Check if an indicator exists and return the record if found",
+      params: [
+        { name: "value", type: "string", description: "The indicator value to check (required)" }
+      ],
+      roles: ["admin", "user", "reporter"],
+      example: `curl -H "Authorization: Bearer ${bearerToken}" \\
+  "${window.location.origin}/api/indicator/check?value=192.168.1.100"`
+    },
+    {
+      method: "GET",
       path: "/api/whitelist",
       description: "Get all whitelist entries",
       roles: ["admin", "user", "reporter"],
@@ -358,7 +369,7 @@ export default function ApiDocsPage() {
       <div>
         <h1 className="text-3xl font-bold">API Documentation</h1>
         <p className="text-muted-foreground">
-          Comprehensive API documentation for programmatic access to the The BlackList platform
+          Comprehensive API documentation for programmatic access to the threat intelligence platform
         </p>
       </div>
 
@@ -535,14 +546,28 @@ response = requests.post(
     json=new_indicator
 )
 
-print(f"Created indicator: {response.json()}")`}</code>
+print(f"Created indicator: {response.json()}")
+
+# Check if an indicator exists
+check_value = "192.168.1.100"
+response = requests.get(
+    f"{API_BASE_URL}/api/indicator/check",
+    headers=headers,
+    params={"value": check_value}
+)
+
+result = response.json()
+if result["exists"]:
+    print(f"Indicator found: {result['indicator']['value']} (ID: {result['indicator']['id']})")
+else:
+    print(f"Indicator not found: {result['message']}")`}</code>
                 </pre>
                 <Button
                   variant="outline"
                   onClick={() => copyToClipboard(`import requests
 
 # Configuration
-API_BASE_URL = "https://localhost:8082"
+API_BASE_URL = "https://your-domain.replit.app"
 API_TOKEN = "${bearerToken || 'your-api-token-here'}"
 
 headers = {
@@ -577,7 +602,7 @@ print(f"Created indicator: {response.json()}")`)}
               <div>
                 <h3 className="text-lg font-semibold mb-2">JavaScript/Node.js Example</h3>
                 <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
-                  <code>{`const API_BASE_URL = "https://localhost:8082";
+                  <code>{`const API_BASE_URL = "https://your-domain.replit.app";
 const API_TOKEN = "${bearerToken || 'your-api-token-here'}";
 
 const headers = {
@@ -616,7 +641,7 @@ createIndicator(newIndicator).then(result => {
                 </pre>
                 <Button
                   variant="outline"
-                  onClick={() => copyToClipboard(`const API_BASE_URL = "https://localhost:8082";
+                  onClick={() => copyToClipboard(`const API_BASE_URL = "https://your-domain.replit.app";
 const API_TOKEN = "${bearerToken || 'your-api-token-here'}";
 
 const headers = {
