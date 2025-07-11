@@ -452,7 +452,11 @@ export default function Users() {
                         <FormItem>
                           <FormLabel>Username</FormLabel>
                           <FormControl>
-                            <Input {...field} />
+                            <Input 
+                              {...field} 
+                              readOnly={createForm.watch("authType") === "ldap"}
+                              className={createForm.watch("authType") === "ldap" ? "bg-gray-100" : ""}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -528,8 +532,11 @@ export default function Users() {
 
                         {selectedLdapUser && (
                           <div className="p-3 border border-green-200 rounded bg-green-50">
-                            <div className="text-sm font-medium text-green-800">Selected User:</div>
+                            <div className="text-sm font-medium text-green-800">Selected LDAP User:</div>
                             <div className="text-sm text-green-700">{selectedLdapUser.cn} ({selectedLdapUser.username})</div>
+                            <div className="text-xs text-green-600 mt-1">
+                              ℹ️ User information will be imported from LDAP and cannot be edited (except role)
+                            </div>
                           </div>
                         )}
                       </div>
