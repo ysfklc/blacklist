@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableTable, SortableColumn } from "@/components/ui/sortable-table";
 import { Trash2, Edit, Plus, Eye, Lock, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -699,110 +700,125 @@ export default function Users() {
       </div>
 
       <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>User</TableHead>
-              <TableHead>Full Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Auth Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              {isAdmin && <TableHead>Actions</TableHead>}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {userList.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={isAdmin ? 8 : 7} className="text-center py-8 text-muted-foreground">
-                  No users found matching your search criteria.
-                </TableCell>
-              </TableRow>
-            ) : (
-              userList.map((user: SystemUser) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center space-x-3">
-                      <UserAvatar user={user} size="sm" />
-                      <span>{user.username}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {user.firstName || user.lastName 
-                      ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
-                      : '-'
-                    }
-                  </TableCell>
-                  <TableCell>{user.email || '-'}</TableCell>
-                  <TableCell>
-                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                      {user.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{user.authType}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={user.isActive ? "default" : "secondary"} className={user.isActive ? "bg-green-500 hover:bg-green-600" : ""}>
-                      {user.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {new Date(user.createdAt).toLocaleDateString()}
-                  </TableCell>
-                  {isAdmin && (
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(user)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        {user.authType === "local" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedUser(user);
-                              setShowAdminPasswordDialog(true);
-                            }}
-                          >
-                            <Lock className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the user
-                                account for "{user.username}".
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(user.id)}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+        <SortableTable
+          data={userList}
+          columns={[
+            {
+              key: "username",
+              label: "User",
+              sortable: true,
+              render: (username: string, user: SystemUser) => (
+                <div className="flex items-center space-x-3">
+                  <UserAvatar user={user} size="sm" />
+                  <span className="font-medium">{username}</span>
+                </div>
+              )
+            },
+            {
+              key: "fullName",
+              label: "Full Name",
+              sortable: true,
+              render: (_, user: SystemUser) => (
+                user.firstName || user.lastName 
+                  ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
+                  : '-'
+              )
+            },
+            {
+              key: "email",
+              label: "Email",
+              sortable: true,
+              render: (email: string) => email || '-'
+            },
+            {
+              key: "role",
+              label: "Role",
+              sortable: true,
+              render: (role: string) => (
+                <Badge variant={role === "admin" ? "default" : "secondary"}>
+                  {role}
+                </Badge>
+              )
+            },
+            {
+              key: "authType",
+              label: "Auth Type",
+              sortable: true,
+              render: (authType: string) => (
+                <Badge variant="outline">{authType}</Badge>
+              )
+            },
+            {
+              key: "isActive",
+              label: "Status",
+              sortable: true,
+              render: (isActive: boolean) => (
+                <Badge 
+                  variant={isActive ? "default" : "secondary"} 
+                  className={isActive ? "bg-green-500 hover:bg-green-600" : ""}
+                >
+                  {isActive ? "Active" : "Inactive"}
+                </Badge>
+              )
+            },
+            {
+              key: "createdAt",
+              label: "Created",
+              sortable: true,
+              render: (createdAt: string) => (
+                <span className="text-sm text-muted-foreground">
+                  {new Date(createdAt).toLocaleDateString()}
+                </span>
+              )
+            }
+          ]}
+          emptyMessage="No users found matching your search criteria."
+          renderRowActions={isAdmin ? (user: SystemUser) => (
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleEdit(user)}
+              >
+                <Edit className="h-4 w-4" />
+              </Button>
+              {user.authType === "local" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedUser(user);
+                    setShowAdminPasswordDialog(true);
+                  }}
+                >
+                  <Lock className="h-4 w-4" />
+                </Button>
+              )}
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the user
+                      account for "{user.username}".
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDelete(user.id)}>
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          ) : undefined}
+        />
       </div>
 
       {/* Pagination Controls */}

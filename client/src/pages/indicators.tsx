@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableTable, SortableColumn } from "@/components/ui/sortable-table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Eye, MessageSquare, Clock, Copy } from "lucide-react";
@@ -508,153 +509,181 @@ export default function Indicators() {
         <Card className="mt-6">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <Table className="min-w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={selectAll}
-                      onCheckedChange={handleSelectAll}
-                      aria-label="Select all indicators"
-                    />
-                  </TableHead>
-                  <TableHead className="w-1/4 max-w-xs">Indicator</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Temp Active Until</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {indicators?.data?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={canDelete ? 9 : 8} className="text-center text-muted-foreground py-8">
-                      No indicators found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  indicators?.data?.map((indicator: Indicator) => (
-                    <TableRow key={indicator.id}>
-                      <TableCell>
+              <SortableTable
+                data={indicators?.data || []}
+                isLoading={isLoading}
+                columns={[
+                  {
+                    key: "select",
+                    label: "",
+                    sortable: false,
+                    className: "w-12",
+                    headerRender: () => (
+                      <Checkbox
+                        checked={selectAll}
+                        onCheckedChange={handleSelectAll}
+                        aria-label="Select all indicators"
+                      />
+                    ),
+                    render: (_, indicator: Indicator) => (
+                      <Checkbox
+                        checked={selectedIndicators.includes(indicator.id)}
+                        onCheckedChange={() => handleSelectIndicator(indicator.id)}
+                        aria-label={`Select indicator ${indicator.value}`}
+                      />
+                    )
+                  },
+                  {
+                    key: "value",
+                    label: "Indicator",
+                    sortable: true,
+                    className: "w-1/4 max-w-xs",
+                    render: (value: string) => (
+                      <div className="flex items-center space-x-2 font-mono text-sm">
+                        <div className="truncate" title={value}>
+                          {value}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyValue(value)}
+                          className="h-6 w-6 p-0 flex-shrink-0"
+                          title="Copy indicator value"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )
+                  },
+                  {
+                    key: "type",
+                    label: "Type",
+                    sortable: true,
+                    render: (type: string) => (
+                      <Badge className={getTypeColor(type)}>
+                        {type.toUpperCase()}
+                      </Badge>
+                    )
+                  },
+                  {
+                    key: "source",
+                    label: "Source",
+                    sortable: true,
+                    render: (source: string, indicator: Indicator) => (
+                      <span className="text-sm text-muted-foreground">
+                        {source === 'manual' ? (indicator.createdByUser || 'Manual Entry') : source}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "isActive",
+                    label: "Status",
+                    sortable: true,
+                    render: (isActive: boolean, indicator: Indicator) => (
+                      <div className="flex items-center space-x-2">
                         <Checkbox
-                          checked={selectedIndicators.includes(indicator.id)}
-                          onCheckedChange={() => handleSelectIndicator(indicator.id)}
-                          aria-label={`Select indicator ${indicator.value}`}
+                          checked={isActive}
+                          onCheckedChange={() => handleToggleStatus(indicator)}
+                          disabled={updateMutation.isPending}
                         />
-                      </TableCell>
-                      <TableCell className="font-mono text-sm max-w-xs">
-                        <div className="flex items-center space-x-2">
-                          <div className="truncate" title={indicator.value}>
-                            {indicator.value}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopyValue(indicator.value)}
-                            className="h-6 w-6 p-0 flex-shrink-0"
-                            title="Copy indicator value"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getTypeColor(indicator.type)}>
-                          {indicator.type.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {indicator.source === 'manual' ? (indicator.createdByUser || 'Manual Entry') : indicator.source}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            checked={indicator.isActive}
-                            onCheckedChange={() => handleToggleStatus(indicator)}
-                            disabled={updateMutation.isPending}
-                          />
-                          <span className="text-sm text-foreground">
-                            {indicator.isActive ? "Active" : "Passive"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {indicator.tempActiveUntil ? (
+                        <span className="text-sm text-foreground">
+                          {isActive ? "Active" : "Passive"}
+                        </span>
+                      </div>
+                    )
+                  },
+                  {
+                    key: "tempActiveUntil",
+                    label: "Temp Active Until",
+                    sortable: true,
+                    render: (tempActiveUntil: string | null) => (
+                      <span className="text-sm text-muted-foreground">
+                        {tempActiveUntil ? (
                           <div className="flex flex-col">
-                            <span>{new Date(indicator.tempActiveUntil).toLocaleDateString()}</span>
+                            <span>{new Date(tempActiveUntil).toLocaleDateString()}</span>
                             <span className="text-xs opacity-70">
-                              {new Date(indicator.tempActiveUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(tempActiveUntil).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                         ) : (
                           <span className="text-muted-foreground/50">—</span>
                         )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {new Date(indicator.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2 text-xs"
-                          onClick={() => handleViewDetails(indicator)}
-                        >
-                          <div className="relative inline-block">
-                            <MessageSquare className="h-3 w-3" />
-                            {(() => {
-                              const notesCount = parseInt(indicator.notesCount?.toString() || '0', 10);
-                              return notesCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center min-w-3 text-[10px]">
-                                  {notesCount}
-                                </span>
-                              );
-                            })()}
-                          </div>
-                          <span className="ml-1">Notes</span>
-                        </Button>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end space-x-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleViewDetails(indicator)}
-                            title="View details and notes"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {(user?.role === "admin" || user?.role === "user") && indicator.isActive && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleTempActivate(indicator.id)}
-                              title="Extend activation period"
-                            >
-                              <Clock className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {canDelete && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(indicator.id)}
-                              disabled={deleteMutation.isPending}
-                              title="Delete indicator"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "createdAt",
+                    label: "Created",
+                    sortable: true,
+                    render: (createdAt: string) => (
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(createdAt).toLocaleDateString()}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "notesCount",
+                    label: "Notes",
+                    sortable: true,
+                    render: (notesCount: number | undefined, indicator: Indicator) => (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={() => handleViewDetails(indicator)}
+                      >
+                        <div className="relative inline-block">
+                          <MessageSquare className="h-3 w-3" />
+                          {(() => {
+                            const count = parseInt(notesCount?.toString() || '0', 10);
+                            return count > 0 && (
+                              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-3 w-3 flex items-center justify-center min-w-3 text-[10px]">
+                                {count}
+                              </span>
+                            );
+                          })()}
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                        <span className="ml-1">Notes</span>
+                      </Button>
+                    )
+                  }
+                ]}
+                emptyMessage="No indicators found"
+                className="min-w-full"
+                renderRowActions={(indicator: Indicator) => (
+                  <div className="flex items-center justify-end space-x-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleViewDetails(indicator)}
+                      title="View details and notes"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {(user?.role === "admin" || user?.role === "user") && indicator.isActive && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleTempActivate(indicator.id)}
+                        title="Extend activation period"
+                      >
+                        <Clock className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {canDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(indicator.id)}
+                        disabled={deleteMutation.isPending}
+                        title="Delete indicator"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 )}
-              </TableBody>
-            </Table>
+              />
             </div>
           </CardContent>
         </Card>

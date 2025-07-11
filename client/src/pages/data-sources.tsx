@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableTable, SortableColumn } from "@/components/ui/sortable-table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Edit, Trash2, Pause, Play, Download, ExternalLink } from "lucide-react";
 import { useForm } from "react-hook-form";
@@ -361,173 +362,190 @@ export default function DataSources() {
 
         <Card className="mt-8">
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Source</TableHead>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Interval</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Last Fetch</TableHead>
-                  <TableHead>Next Fetch</TableHead>
-                  {isAdmin && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dataSources?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={isAdmin ? 8 : 7} className="text-center text-gray-500 py-8">
-                      No data sources configured
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  dataSources?.map((source) => (
-                    <TableRow key={source.id}>
-                      <TableCell className="font-medium">{source.name}</TableCell>
-                      <TableCell className="text-sm text-gray-500 max-w-xs">
-                        <div className="flex items-center space-x-2">
-                          <div className="truncate" title={source.url}>
-                            {source.url}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => window.open(source.url, '_blank', 'noopener,noreferrer')}
-                            className="h-6 w-6 p-0 flex-shrink-0"
-                            title="Open URL in new tab"
-                          >
-                            <ExternalLink className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell className="capitalize">{source.indicatorTypes.join(", ")}</TableCell>
-                      <TableCell>{source.fetchInterval}s</TableCell>
-                      <TableCell>
-                        <span
-                          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            !source.isActive
-                              ? "bg-gray-100 text-gray-800"
-                              : source.isPaused
-                              ? "bg-orange-100 text-orange-800"
-                              : source.lastFetchStatus === "success"
-                              ? "bg-green-100 text-green-800"
-                              : source.lastFetchStatus === "error"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full mr-1 ${
-                              !source.isActive
-                                ? "bg-gray-400"
-                                : source.isPaused
-                                ? "bg-orange-400"
-                                : source.lastFetchStatus === "success"
-                                ? "bg-green-400"
-                                : source.lastFetchStatus === "error"
-                                ? "bg-red-400"
-                                : "bg-yellow-400"
-                            }`}
-                          ></span>
-                          {!source.isActive
-                            ? "Inactive"
+            <SortableTable
+              data={dataSources || []}
+              isLoading={isLoading}
+              columns={[
+                {
+                  key: "name",
+                  label: "Source",
+                  sortable: true,
+                  render: (name: string) => <span className="font-medium">{name}</span>
+                },
+                {
+                  key: "url",
+                  label: "URL",
+                  sortable: true,
+                  className: "max-w-xs",
+                  render: (url: string) => (
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                      <div className="truncate" title={url}>
+                        {url}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+                        className="h-6 w-6 p-0 flex-shrink-0"
+                        title="Open URL in new tab"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )
+                },
+                {
+                  key: "indicatorTypes",
+                  label: "Type",
+                  sortable: true,
+                  render: (types: string[]) => (
+                    <span className="capitalize">{types.join(", ")}</span>
+                  )
+                },
+                {
+                  key: "fetchInterval",
+                  label: "Interval",
+                  sortable: true,
+                  render: (interval: number) => `${interval}s`
+                },
+                {
+                  key: "status",
+                  label: "Status",
+                  sortable: true,
+                  render: (_, source: DataSource) => (
+                    <span
+                      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        !source.isActive
+                          ? "bg-gray-100 text-gray-800"
+                          : source.isPaused
+                          ? "bg-orange-100 text-orange-800"
+                          : source.lastFetchStatus === "success"
+                          ? "bg-green-100 text-green-800"
+                          : source.lastFetchStatus === "error"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-yellow-100 text-yellow-800"
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full mr-1 ${
+                          !source.isActive
+                            ? "bg-gray-400"
                             : source.isPaused
-                            ? "Paused"
+                            ? "bg-orange-400"
                             : source.lastFetchStatus === "success"
-                            ? "Active"
+                            ? "bg-green-400"
                             : source.lastFetchStatus === "error"
-                            ? "Error"
-                            : "Pending"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {source.lastFetch
-                          ? new Date(source.lastFetch).toLocaleString()
-                          : "Never"}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {source.isPaused ? (
-                          "Paused"
-                        ) : source.lastFetch ? (
-                          (() => {
-                            const lastFetchTime = new Date(source.lastFetch).getTime();
-                            const now = Date.now();
-                            const elapsedSeconds = Math.floor((now - lastFetchTime) / 1000);
-                            const remainingSeconds = Math.max(0, source.fetchInterval - elapsedSeconds);
-                            const remainingMinutes = Math.floor(remainingSeconds / 60);
-                            const remainingHours = Math.floor(remainingMinutes / 60);
-                            
-                            if (remainingSeconds <= 0) {
-                              return "Now";
-                            } else if (remainingHours > 0) {
-                              return `In ${remainingHours}h ${remainingMinutes % 60}m`;
-                            } else if (remainingMinutes > 0) {
-                              return `In ${remainingMinutes}m`;
-                            } else {
-                              return `In ${remainingSeconds}s`;
-                            }
-                          })()
-                        ) : (
-                          "Pending"
-                        )}
-                      </TableCell>
-                      {isAdmin && (
-                        <TableCell className="text-right">
-                          <div className="flex justify-end space-x-1">
-                            {source.isPaused ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => resumeMutation.mutate(source.id)}
-                                disabled={resumeMutation.isPending}
-                                title="Resume Fetching"
-                              >
-                                <Play className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => pauseMutation.mutate(source.id)}
-                                disabled={pauseMutation.isPending}
-                                title="Pause Fetching"
-                              >
-                                <Pause className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => fetchNowMutation.mutate(source.id)}
-                              disabled={fetchNowMutation.isPending || source.isPaused}
-                              title={source.isPaused ? "Resume source to fetch now" : "Pull Now"}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(source)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(source.id)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                            ? "bg-red-400"
+                            : "bg-yellow-400"
+                        }`}
+                      ></span>
+                      {!source.isActive
+                        ? "Inactive"
+                        : source.isPaused
+                        ? "Paused"
+                        : source.lastFetchStatus === "success"
+                        ? "Active"
+                        : source.lastFetchStatus === "error"
+                        ? "Error"
+                        : "Pending"}
+                    </span>
+                  )
+                },
+                {
+                  key: "lastFetch",
+                  label: "Last Fetch",
+                  sortable: true,
+                  render: (lastFetch: string | null) => (
+                    <span className="text-sm text-gray-500">
+                      {lastFetch ? new Date(lastFetch).toLocaleString() : "Never"}
+                    </span>
+                  )
+                },
+                {
+                  key: "nextFetch",
+                  label: "Next Fetch",
+                  sortable: false,
+                  render: (_, source: DataSource) => (
+                    <span className="text-sm text-gray-500">
+                      {source.isPaused ? (
+                        "Paused"
+                      ) : source.lastFetch ? (
+                        (() => {
+                          const lastFetchTime = new Date(source.lastFetch).getTime();
+                          const now = Date.now();
+                          const elapsedSeconds = Math.floor((now - lastFetchTime) / 1000);
+                          const remainingSeconds = Math.max(0, source.fetchInterval - elapsedSeconds);
+                          const remainingMinutes = Math.floor(remainingSeconds / 60);
+                          const remainingHours = Math.floor(remainingMinutes / 60);
+                          
+                          if (remainingSeconds <= 0) {
+                            return "Now";
+                          } else if (remainingHours > 0) {
+                            return `In ${remainingHours}h ${remainingMinutes % 60}m`;
+                          } else if (remainingMinutes > 0) {
+                            return `In ${remainingMinutes}m`;
+                          } else {
+                            return `In ${remainingSeconds}s`;
+                          }
+                        })()
+                      ) : (
+                        "Pending"
                       )}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                    </span>
+                  )
+                }
+              ]}
+              emptyMessage="No data sources configured"
+              renderRowActions={isAdmin ? (source: DataSource) => (
+                <div className="flex justify-end space-x-1">
+                  {source.isPaused ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => resumeMutation.mutate(source.id)}
+                      disabled={resumeMutation.isPending}
+                      title="Resume Fetching"
+                    >
+                      <Play className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => pauseMutation.mutate(source.id)}
+                      disabled={pauseMutation.isPending}
+                      title="Pause Fetching"
+                    >
+                      <Pause className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchNowMutation.mutate(source.id)}
+                    disabled={fetchNowMutation.isPending || source.isPaused}
+                    title={source.isPaused ? "Resume source to fetch now" : "Pull Now"}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleEdit(source)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDelete(source.id)}
+                    disabled={deleteMutation.isPending}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : undefined}
+            />
           </CardContent>
         </Card>
 

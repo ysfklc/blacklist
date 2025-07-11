@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableTable, SortableColumn } from "@/components/ui/sortable-table";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Copy } from "lucide-react";
@@ -316,87 +317,100 @@ export default function Whitelist() {
         {/* Whitelist Table */}
         <Card className="mt-6">
           <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {canDelete && (
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectAll}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </TableHead>
-                  )}
-                  <TableHead>Value</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Added By</TableHead>
-                  <TableHead>Date Added</TableHead>
-                  {canDelete && <TableHead className="text-right">Actions</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {whitelist?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={canDelete ? 7 : 5} className="text-center text-gray-500 py-8">
-                      No whitelist entries found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  whitelist?.map((entry) => (
-                    <TableRow key={entry.id} className="group">
-                      {canDelete && (
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedEntries.includes(entry.id)}
-                            onCheckedChange={() => handleSelectEntry(entry.id)}
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell className="font-mono text-sm">
-                        <div className="flex items-center space-x-2">
-                          <span>{entry.value}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopy(entry.value)}
-                            className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getTypeColor(entry.type)}>
-                          {entry.type.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500 max-w-xs">
-                        {entry.reason || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {entry.createdBy?.username || "Unknown"}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {new Date(entry.createdAt).toLocaleDateString()}
-                      </TableCell>
-                      {canDelete && (
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(entry.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            <SortableTable
+              data={whitelist || []}
+              isLoading={isLoading}
+              columns={[
+                ...(canDelete ? [{
+                  key: "select",
+                  label: "",
+                  sortable: false,
+                  className: "w-12",
+                  headerRender: () => (
+                    <Checkbox
+                      checked={selectAll}
+                      onCheckedChange={handleSelectAll}
+                    />
+                  ),
+                  render: (_, entry: WhitelistEntry) => (
+                    <Checkbox
+                      checked={selectedEntries.includes(entry.id)}
+                      onCheckedChange={() => handleSelectEntry(entry.id)}
+                    />
+                  )
+                }] : []),
+                {
+                  key: "value",
+                  label: "Value",
+                  sortable: true,
+                  render: (value: string) => (
+                    <div className="flex items-center space-x-2 font-mono text-sm group">
+                      <span>{value}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleCopy(value)}
+                        className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )
+                },
+                {
+                  key: "type",
+                  label: "Type",
+                  sortable: true,
+                  render: (type: string) => (
+                    <Badge className={getTypeColor(type)}>
+                      {type.toUpperCase()}
+                    </Badge>
+                  )
+                },
+                {
+                  key: "reason",
+                  label: "Reason",
+                  sortable: true,
+                  className: "max-w-xs",
+                  render: (reason: string | null) => (
+                    <span className="text-sm text-gray-500">
+                      {reason || "-"}
+                    </span>
+                  )
+                },
+                {
+                  key: "createdBy.username",
+                  label: "Added By",
+                  sortable: true,
+                  render: (_, entry: WhitelistEntry) => (
+                    <span className="text-sm text-gray-500">
+                      {entry.createdBy?.username || "Unknown"}
+                    </span>
+                  )
+                },
+                {
+                  key: "createdAt",
+                  label: "Date Added",
+                  sortable: true,
+                  render: (createdAt: string) => (
+                    <span className="text-sm text-gray-500">
+                      {new Date(createdAt).toLocaleDateString()}
+                    </span>
+                  )
+                }
+              ]}
+              emptyMessage="No whitelist entries found"
+              renderRowActions={canDelete ? (entry: WhitelistEntry) => (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(entry.id)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              ) : undefined}
+            />
           </CardContent>
         </Card>
 

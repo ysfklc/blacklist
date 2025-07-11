@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { SortableTable, SortableColumn } from "@/components/ui/sortable-table";
 import { Badge } from "@/components/ui/badge";
 import { Download, Copy } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -219,68 +220,95 @@ export default function AuditLogs() {
         <Card className="mt-6">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <Table className="min-w-full">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Timestamp</TableHead>
-                  <TableHead>Level</TableHead>
-                  <TableHead>User</TableHead>
-                  <TableHead>Action</TableHead>
-                  <TableHead>Resource</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead>IP Address</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {logs?.data?.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                      No audit logs found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  logs?.data?.map((log: AuditLog) => (
-                    <TableRow key={log.id} className="group">
-                      <TableCell className="text-sm">
-                        {new Date(log.createdAt).toLocaleString()}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getLevelColor(log.level)}>
-                          {log.level.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {log.user || "System"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground uppercase">
-                        {log.action}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground capitalize">
-                        {log.resource.replace('_', ' ')}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-sm">
-                        <div className="flex items-center space-x-2">
-                          <div className="truncate" title={log.details}>
-                            {log.details}
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopyDetails(log.details)}
-                            className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
+              <SortableTable
+                data={logs?.data || []}
+                isLoading={isLoading}
+                columns={[
+                  {
+                    key: "createdAt",
+                    label: "Timestamp",
+                    sortable: true,
+                    render: (createdAt: string) => (
+                      <span className="text-sm">
+                        {new Date(createdAt).toLocaleString()}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "level",
+                    label: "Level",
+                    sortable: true,
+                    render: (level: string) => (
+                      <Badge className={getLevelColor(level)}>
+                        {level.toUpperCase()}
+                      </Badge>
+                    )
+                  },
+                  {
+                    key: "user",
+                    label: "User",
+                    sortable: true,
+                    render: (user: string | null) => (
+                      <span className="text-sm text-muted-foreground">
+                        {user || "System"}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "action",
+                    label: "Action",
+                    sortable: true,
+                    render: (action: string) => (
+                      <span className="text-sm text-muted-foreground uppercase">
+                        {action}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "resource",
+                    label: "Resource",
+                    sortable: true,
+                    render: (resource: string) => (
+                      <span className="text-sm text-muted-foreground capitalize">
+                        {resource.replace('_', ' ')}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "details",
+                    label: "Details",
+                    sortable: true,
+                    className: "max-w-sm",
+                    render: (details: string) => (
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground group">
+                        <div className="truncate" title={details}>
+                          {details}
                         </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {log.ipAddress || "-"}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopyDetails(details)}
+                          className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )
+                  },
+                  {
+                    key: "ipAddress",
+                    label: "IP Address",
+                    sortable: true,
+                    render: (ipAddress: string | null) => (
+                      <span className="text-sm text-muted-foreground">
+                        {ipAddress || "-"}
+                      </span>
+                    )
+                  }
+                ]}
+                emptyMessage="No audit logs found"
+                className="min-w-full"
+              />
             </div>
           </CardContent>
         </Card>
