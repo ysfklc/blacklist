@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, ExternalLink, Copy, Info } from "lucide-react";
+import { RefreshCw, ExternalLink, Copy, Info, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface PublicFileStats {
@@ -149,14 +149,30 @@ export default function PublicLinks() {
                 <div className="mt-3 space-y-1">
                   {files?.IP && files.IP.length > 0 ? (
                     files.IP.map((file, index) => (
-                      <div key={file}>
-                        <a 
-                          href={`/public/blacklist/IP/${file}`}
-                          download
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                        >
-                          {file} <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
+                      <div key={file} className="flex items-center justify-between py-1">
+                        <span className="text-sm font-medium text-gray-900 truncate flex-1">{file}</span>
+                        <div className="flex items-center space-x-1 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/IP/${file}`} download title="Download file">
+                              <Download className="h-3 w-3" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/IP/${file}`} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -191,14 +207,30 @@ export default function PublicLinks() {
                 <div className="mt-3 space-y-1">
                   {files?.Domain && files.Domain.length > 0 ? (
                     files.Domain.map((file, index) => (
-                      <div key={file}>
-                        <a 
-                          href={`/public/blacklist/Domain/${file}`}
-                          download
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                        >
-                          {file} <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
+                      <div key={file} className="flex items-center justify-between py-1">
+                        <span className="text-sm font-medium text-gray-900 truncate flex-1">{file}</span>
+                        <div className="flex items-center space-x-1 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/Domain/${file}`} download title="Download file">
+                              <Download className="h-3 w-3" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/Domain/${file}`} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -233,14 +265,30 @@ export default function PublicLinks() {
                 <div className="mt-3 space-y-1">
                   {files?.Hash && files.Hash.length > 0 ? (
                     files.Hash.map((file, index) => (
-                      <div key={file}>
-                        <a 
-                          href={`/public/blacklist/Hash/${file}`}
-                          download
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                        >
-                          {file} <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
+                      <div key={file} className="flex items-center justify-between py-1">
+                        <span className="text-sm font-medium text-gray-900 truncate flex-1">{file}</span>
+                        <div className="flex items-center space-x-1 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/Hash/${file}`} download title="Download file">
+                              <Download className="h-3 w-3" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/Hash/${file}`} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -275,14 +323,30 @@ export default function PublicLinks() {
                 <div className="mt-3 space-y-1">
                   {files?.URL && files.URL.length > 0 ? (
                     files.URL.map((file, index) => (
-                      <div key={file}>
-                        <a 
-                          href={`/public/blacklist/URL/${file}`}
-                          download
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                        >
-                          {file} <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
+                      <div key={file} className="flex items-center justify-between py-1">
+                        <span className="text-sm font-medium text-gray-900 truncate flex-1">{file}</span>
+                        <div className="flex items-center space-x-1 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/URL/${file}`} download title="Download file">
+                              <Download className="h-3 w-3" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/URL/${file}`} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -317,14 +381,30 @@ export default function PublicLinks() {
                 <div className="mt-3 space-y-1">
                   {files?.Proxy && files.Proxy.length > 0 ? (
                     files.Proxy.map((file, index) => (
-                      <div key={file}>
-                        <a 
-                          href={`/public/blacklist/Proxy/${file}`}
-                          download
-                          className="text-blue-600 hover:text-blue-900 text-sm font-medium inline-flex items-center"
-                        >
-                          {file} <ExternalLink className="ml-1 h-3 w-3" />
-                        </a>
+                      <div key={file} className="flex items-center justify-between py-1">
+                        <span className="text-sm font-medium text-gray-900 truncate flex-1">{file}</span>
+                        <div className="flex items-center space-x-1 ml-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/Proxy/${file}`} download title="Download file">
+                              <Download className="h-3 w-3" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            asChild
+                            className="h-7 w-7 p-0 text-blue-600 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <a href={`/public/blacklist/Proxy/${file}`} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </Button>
+                        </div>
                       </div>
                     ))
                   ) : (
@@ -336,10 +416,10 @@ export default function PublicLinks() {
           </Card>
         </div>
 
-        {/* API Endpoints */}
+        {/* Directories */}
         <Card className="mt-8">
           <CardHeader>
-            <CardTitle>API Endpoints</CardTitle>
+            <CardTitle>Directories</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">

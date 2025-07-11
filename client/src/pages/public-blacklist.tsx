@@ -6,6 +6,7 @@ import {
   Globe,
   Hash,
   Link as LinkIcon,
+  ExternalLink,
 } from "lucide-react";
 import { FeedLogo } from "@/components/ui/feed-logo";
 
@@ -176,26 +177,44 @@ export default function PublicBlacklist() {
                     {safeFileList.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {safeFileList.map((filename: string) => (
-                          <a
+                          <div
                             key={filename}
-                            href={`/public/blacklist/${type}/${filename}`}
-                            download
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+                            className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors"
                           >
-                            <Download className="h-5 w-5 text-gray-400 group-hover:text-blue-600 mr-3" />
-                            <div className="flex-1">
-                              <p className="font-medium text-gray-900 group-hover:text-blue-900">
-                                {filename}
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                {stats?.[
-                                  type.toLowerCase() as keyof BlacklistStats
-                                ]?.lastUpdated
-                                  ? `Updated: ${new Date(stats[type.toLowerCase() as keyof BlacklistStats].lastUpdated).toLocaleDateString()}`
-                                  : "Click to download"}
-                              </p>
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <p className="font-medium text-gray-900">
+                                  {filename}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {stats?.[
+                                    type.toLowerCase() as keyof BlacklistStats
+                                  ]?.lastUpdated
+                                    ? `Updated: ${new Date(stats[type.toLowerCase() as keyof BlacklistStats].lastUpdated).toLocaleDateString()}`
+                                    : "Available for download"}
+                                </p>
+                              </div>
+                              <div className="flex items-center space-x-2 ml-4">
+                                <a
+                                  href={`/public/blacklist/${type}/${filename}`}
+                                  download
+                                  className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors"
+                                  title="Download file"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </a>
+                                <a
+                                  href={`/public/blacklist/${type}/${filename}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg transition-colors"
+                                  title="Open in new tab"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </div>
                             </div>
-                          </a>
+                          </div>
                         ))}
                       </div>
                     ) : (
