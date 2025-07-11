@@ -79,7 +79,7 @@ export interface IStorage {
   getWhitelist(): Promise<any[]>;
   createWhitelistEntry(entry: InsertWhitelistEntry): Promise<WhitelistEntry>;
   deleteWhitelistEntry(id: number): Promise<void>;
-  deactivateIndicatorsFromWhitelist(value: string, type: string): Promise<number>;
+  deleteIndicatorsFromWhitelist(value: string, type: string): Promise<number>;
   
   // Whitelist blocks operations
   getWhitelistBlocks(page: number, limit: number): Promise<any>;
@@ -759,25 +759,22 @@ export class DatabaseStorage implements IStorage {
     await db.delete(whitelist).where(eq(whitelist.id, id));
   }
 
-  async deactivateIndicatorsFromWhitelist(value: string, type: string): Promise<number> {
-    let deactivatedCount = 0;
+  async deleteIndicatorsFromWhitelist(value: string, type: string): Promise<number> {
+    let deletedCount = 0;
 
     if (type === 'ip' && value.includes('/')) {
-      // Handle CIDR range deactivation
+      // Handle CIDR range deletion
       try {
         const cidr = new CIDR(value);
         
-        // Get all active IP indicators
-        const activeIps = await db
+        // Get all IP indicators (both active and inactive)
+        const allIps = await db
           .select({ id: indicators.id, value: indicators.value })
           .from(indicators)
-          .where(and(
-            eq(indicators.type, 'ip'),
-            eq(indicators.isActive, true)
-          ));
+          .where(eq(indicators.type, 'ip'));
 
         // Find IPs that fall within the CIDR range
-        const ipsToDeactivate = activeIps.filter(ip => {
+        const ipsToDelete = allIps.filter(ip => {
           try {
             return cidr.contains(ip.value);
           } catch {
@@ -785,50 +782,33 @@ export class DatabaseStorage implements IStorage {
           }
         });
 
-        if (ipsToDeactivate.length > 0) {
-          const idsToDeactivate = ipsToDeactivate.map(ip => ip.id);
+        if (ipsToDelete.length > 0) {
+          const idsToDelete = ipsToDelete.map(ip => ip.id);
           
-          // Deactivate indicators
+          // Delete indicators
           await db
-            .update(indicators)
-            .set({ 
-              isActive: false,
-              updatedAt: new Date(),
-              notes: sql`COALESCE(notes, '') || CASE 
-                WHEN COALESCE(notes, '') = '' THEN 'Deactivated due to whitelist entry: ' || ${value} || ' (added by system)'
-                ELSE E'\n' || 'Deactivated due to whitelist entry: ' || ${value} || ' (added by system)'
-              END`
-            })
-            .where(inArray(indicators.id, idsToDeactivate));
+            .delete(indicators)
+            .where(inArray(indicators.id, idsToDelete));
 
-          deactivatedCount = ipsToDeactivate.length;
+          deletedCount = ipsToDelete.length;
         }
       } catch (error) {
         console.warn(`Invalid CIDR format: ${value}`);
       }
     } else {
-      // Handle exact match deactivation
+      // Handle exact match deletion
       const result = await db
-        .update(indicators)
-        .set({ 
-          isActive: false,
-          updatedAt: new Date(),
-          notes: sql`COALESCE(notes, '') || CASE 
-            WHEN COALESCE(notes, '') = '' THEN 'Deactivated due to whitelist entry: ' || ${value} || ' (added by system)'
-            ELSE E'\n' || 'Deactivated due to whitelist entry: ' || ${value} || ' (added by system)'
-          END`
-        })
+        .delete(indicators)
         .where(and(
           eq(indicators.value, value),
-          eq(indicators.type, type),
-          eq(indicators.isActive, true)
+          eq(indicators.type, type)
         ))
         .returning({ id: indicators.id });
 
-      deactivatedCount = result.length;
+      deletedCount = result.length;
     }
 
-    return deactivatedCount;
+    return deletedCount;
   }
 
   async getAuditLogs(page: number, limit: number, filters: any): Promise<any> {
