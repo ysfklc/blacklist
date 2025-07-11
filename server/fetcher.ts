@@ -113,12 +113,16 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
       
     } catch (error) {
       lastError = error as Error;
-      console.error(`[FETCH] Attempt ${attempt} failed for ${source.name}:`, error);
+      const errorDetails = error instanceof Error ? error.message : String(error);
+      console.error(`[FETCH] Attempt ${attempt} failed for ${source.name}: ${errorDetails}`);
+      console.error(`[FETCH] URL: ${source.url}`);
       
       if (attempt < maxRetries) {
         const delay = Math.min(1000 * Math.pow(2, attempt), 10000); // Exponential backoff, max 10s
-        console.log(`[FETCH] Retrying in ${delay}ms...`);
+        console.log(`[FETCH] Retrying in ${delay}ms... (${maxRetries - attempt} attempts remaining)`);
         await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        console.error(`[FETCH] All ${maxRetries} attempts failed for ${source.name}`);
       }
     }
   }
@@ -152,7 +156,7 @@ async function processAllIndicators(source: DataSource, parsed: ParsedIndicators
         break;
       case "soar-url":
         indicators = parsed.soarUrls;
-        break;   
+        break;
     }
     
     if (indicators.length > 0) {
@@ -172,34 +176,115 @@ async function processAllIndicators(source: DataSource, parsed: ParsedIndicators
 
 async function handleFetchError(source: DataSource, error: Error): Promise<void> {
   let errorMessage = "Unknown error";
-  if (error.name === 'AbortError') {
-    errorMessage = "Request timeout";
-  } else if (error.message.includes('ECONNRESET')) {
-    errorMessage = "Connection reset by remote server";
-  } else if (error.message.includes('ENOTFOUND')) {
-    errorMessage = "DNS resolution failed";
-  } else if (error.message.includes('ECONNREFUSED')) {
-    errorMessage = "Connection refused";
-  } else {
-    errorMessage = error.message;
+  let errorCode = "";
+  let httpStatus = "";
+  let hostname = "";
+  
+  try {
+    hostname = new URL(source.url).hostname;
+  } catch {
+    hostname = source.url;
   }
   
-  console.log(`[FETCH] Setting error status for ${source.name}: ${errorMessage}`);
+  // Deep error analysis - check the error object and its cause
+  const fullErrorText = JSON.stringify(error, Object.getOwnPropertyNames(error));
+  const errorString = error.toString();
+  const errorCause = (error as any).cause;
   
-  await storage.updateDataSourceStatus(source.id, "error", errorMessage);
+  console.log(`[FETCH] Analyzing error for ${source.name}:`);
+  console.log(`[FETCH] Error name: ${error.name}`);
+  console.log(`[FETCH] Error message: ${error.message}`);
+  console.log(`[FETCH] Error cause:`, errorCause);
+  
+  // Enhanced error categorization with deeper inspection
+  if (error.name === 'AbortError') {
+    errorMessage = "Request timeout (exceeded 60 seconds)";
+    errorCode = "TIMEOUT";
+  } else if (errorCause || (error as any).code) {
+    // Check the underlying cause or error code
+    const cause = errorCause || error;
+    const code = (cause as any).code || (cause as any).errno;
+    const syscall = (cause as any).syscall;
+    
+    console.log(`[FETCH] Underlying error code: ${code}, syscall: ${syscall}`);
+    
+    if (code === 'ENOTFOUND' || code === -3008) {
+      errorMessage = `DNS resolution failed - hostname '${hostname}' not found`;
+      errorCode = "ENOTFOUND";
+    } else if (code === 'ECONNREFUSED' || code === -61) {
+      errorMessage = `Connection refused by remote server '${hostname}'`;
+      errorCode = "ECONNREFUSED";
+    } else if (code === 'ECONNRESET' || code === -54) {
+      errorMessage = `Connection reset by remote server '${hostname}'`;
+      errorCode = "ECONNRESET";
+    } else if (code === 'EHOSTUNREACH' || code === -65) {
+      errorMessage = `Host '${hostname}' unreachable`;
+      errorCode = "EHOSTUNREACH";
+    } else if (code === 'ENETUNREACH' || code === -51) {
+      errorMessage = `Network unreachable to '${hostname}'`;
+      errorCode = "ENETUNREACH";
+    } else if (code === 'ETIMEDOUT' || code === -60) {
+      errorMessage = `Connection timeout to '${hostname}'`;
+      errorCode = "ETIMEDOUT";
+    } else if (code === 'EPROTO' || syscall === 'read') {
+      errorMessage = `Protocol error (SSL/TLS handshake failed) with '${hostname}'`;
+      errorCode = "EPROTO";
+    } else if (cause.message && cause.message.includes('certificate')) {
+      errorMessage = `SSL certificate error for '${hostname}'`;
+      errorCode = "SSL_CERT_ERROR";
+    } else {
+      errorMessage = `Network error: ${cause.message || error.message} (${hostname})`;
+      errorCode = code || error.name || "NETWORK_ERROR";
+    }
+  } else if (error.message.includes('ENOTFOUND')) {
+    errorMessage = `DNS resolution failed - hostname '${hostname}' not found`;
+    errorCode = "ENOTFOUND";
+  } else if (error.message.includes('ECONNREFUSED')) {
+    errorMessage = `Connection refused by remote server '${hostname}'`;
+    errorCode = "ECONNREFUSED";
+  } else if (error.message.includes('ECONNRESET')) {
+    errorMessage = `Connection reset by remote server '${hostname}'`;
+    errorCode = "ECONNRESET";
+  } else if (error.message.includes('timeout')) {
+    errorMessage = `Request timeout to '${hostname}'`;
+    errorCode = "TIMEOUT";
+  } else if (error.message.startsWith('HTTP')) {
+    // Handle HTTP status errors
+    errorMessage = `${error.message} from '${hostname}'`;
+    errorCode = "HTTP_ERROR";
+    const statusMatch = error.message.match(/HTTP (\d+)/);
+    if (statusMatch) {
+      httpStatus = ` (HTTP ${statusMatch[1]})`;
+      errorCode = `HTTP_${statusMatch[1]}`;
+    }
+  } else {
+    errorMessage = `${error.message} (${hostname})`;
+    errorCode = error.name || "UNKNOWN";
+  }
+  
+  const detailedError = `${errorMessage}${httpStatus}`;
+  
+  console.log(`[FETCH] Setting error status for ${source.name}: ${detailedError}`);
+  console.log(`[FETCH] Full error details - URL: ${source.url}, Error Code: ${errorCode}, Hostname: ${hostname}`);
+  
+  await storage.updateDataSourceStatus(source.id, "error", detailedError);
 
   await storage.createAuditLog({
     level: "error",
     action: "fetch",
     resource: "data_source",
     resourceId: source.id.toString(),
-    details: `Failed to fetch from ${source.name}: ${errorMessage}`,
+    details: `Failed to fetch from ${source.name}: ${detailedError} - URL: ${source.url}`,
     metadata: {
-      error: errorMessage,
+      error: detailedError,
+      errorCode: errorCode,
       url: source.url,
+      hostname: hostname,
+      fullErrorMessage: error.message,
+      errorCause: errorCause ? JSON.stringify(errorCause, Object.getOwnPropertyNames(errorCause)) : null,
+      errorStack: error.stack?.substring(0, 500),
     },
   });
-
 }
 
 async function processIndicatorsInBackground(source: DataSource, indicators: string[], hashType?: string, indicatorType?: string): Promise<void> {
@@ -312,7 +397,7 @@ function parseData(data: string, source: DataSource): ParsedIndicators {
   const domains = Array.from(new Set(data.match(DOMAIN_REGEX) || []));
   const hashes = Array.from(new Set(data.match(HASH_REGEX) || []));
   const urls = Array.from(new Set(data.match(URL_REGEX) || []));
-
+  
   // For SOAR-URL type, process line by line without regex filtering or deduplication
   let soarUrls: string[] = [];
   if (source.indicatorTypes.includes('soar-url')) {

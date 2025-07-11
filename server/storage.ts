@@ -77,6 +77,7 @@ export interface IStorage {
 
   // Whitelist operations
   getWhitelist(): Promise<any[]>;
+  getWhitelistEntryById(id: number): Promise<WhitelistEntry | undefined>;
   createWhitelistEntry(entry: InsertWhitelistEntry): Promise<WhitelistEntry>;
   deleteWhitelistEntry(id: number): Promise<void>;
   deleteIndicatorsFromWhitelist(value: string, type: string): Promise<number>;
@@ -746,6 +747,16 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(whitelist.createdAt));
   }
 
+  async getWhitelistEntryById(id: number): Promise<WhitelistEntry | undefined> {
+    const [entry] = await db
+      .select()
+      .from(whitelist)
+      .where(eq(whitelist.id, id))
+      .limit(1);
+    
+    return entry || undefined;
+  }
+
   async createWhitelistEntry(entry: InsertWhitelistEntry): Promise<WhitelistEntry> {
     const [created] = await db
       .insert(whitelist)
@@ -756,6 +767,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteWhitelistEntry(id: number): Promise<void> {
+    // First delete any whitelist blocks that reference this whitelist entry
+    await db.delete(whitelistBlocks).where(eq(whitelistBlocks.whitelistEntryId, id));
+    
+    // Then delete the whitelist entry
     await db.delete(whitelist).where(eq(whitelist.id, id));
   }
 
@@ -1095,6 +1110,7 @@ export class DatabaseStorage implements IStorage {
   async recordWhitelistBlock(value: string, type: string, source: string, sourceId?: number): Promise<void> {
     // Find the whitelist entry that blocked this indicator
     let whitelistEntryId: number | undefined;
+    let whitelistEntryValue: string | undefined;
     
     if (type === 'ip' && await this.isWhitelisted(value, type)) {
       // For IP addresses, find the matching whitelist entry (including CIDR ranges)
@@ -1106,6 +1122,7 @@ export class DatabaseStorage implements IStorage {
       for (const entry of whitelistEntries) {
         if (entry.value === value) {
           whitelistEntryId = entry.id;
+          whitelistEntryValue = entry.value;
           break;
         }
         
@@ -1114,6 +1131,7 @@ export class DatabaseStorage implements IStorage {
             const cidr = new CIDR(entry.value);
             if (cidr.contains(value)) {
               whitelistEntryId = entry.id;
+              whitelistEntryValue = entry.value;
               break;
             }
           } catch {
@@ -1124,13 +1142,14 @@ export class DatabaseStorage implements IStorage {
     } else {
       // For other types, find exact match
       const [entry] = await db
-        .select({ id: whitelist.id })
+        .select({ id: whitelist.id, value: whitelist.value })
         .from(whitelist)
         .where(and(
           eq(whitelist.value, value),
           eq(whitelist.type, type)
         ));
       whitelistEntryId = entry?.id;
+      whitelistEntryValue = entry?.value;
     }
 
     await this.createWhitelistBlock({
@@ -1140,6 +1159,16 @@ export class DatabaseStorage implements IStorage {
       sourceId,
       whitelistEntryId,
       blockedReason: `Blocked by whitelist entry during feed processing`,
+    });
+
+    // Create audit log for whitelist block
+    await this.createAuditLog({
+      level: "warning",
+      action: "blocked",
+      resource: "indicator",
+      details: `Whitelist blocked indicator: ${value} (${type}) from source "${source}"${whitelistEntryValue ? ` - blocked by whitelist entry: ${whitelistEntryValue}` : ''}`,
+      userId: 1, // System user for automated blocks
+      ipAddress: '127.0.0.1', // System IP for automated actions
     });
   }
 

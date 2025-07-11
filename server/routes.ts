@@ -1236,6 +1236,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/whitelist/:id", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // Get the whitelist entry details before deletion for logging
+      const whitelistEntry = await storage.getWhitelistEntryById(id);
+      if (!whitelistEntry) {
+        return res.status(404).json({ error: "Whitelist entry not found" });
+      }
+      
       await storage.deleteWhitelistEntry(id);
       
       await storage.createAuditLog({
@@ -1243,7 +1250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "delete",
         resource: "whitelist",
         resourceId: id.toString(),
-        details: `Removed from whitelist`,
+        details: `Removed from whitelist: ${whitelistEntry.value} (${whitelistEntry.type})`,
         userId: req.user.userId,
         ipAddress: req.ip,
       });
@@ -1268,11 +1275,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       let successCount = 0;
       let errorCount = 0;
+      let deletedEntries: string[] = [];
       
       for (const id of ids) {
         try {
-          await storage.deleteWhitelistEntry(parseInt(id));
-          successCount++;
+          // Get the whitelist entry details before deletion for logging
+          const whitelistEntry = await storage.getWhitelistEntryById(parseInt(id));
+          if (whitelistEntry) {
+            await storage.deleteWhitelistEntry(parseInt(id));
+            deletedEntries.push(`${whitelistEntry.value} (${whitelistEntry.type})`);
+            successCount++;
+          } else {
+            errorCount++;
+          }
         } catch (error) {
           errorCount++;
         }
@@ -1282,7 +1297,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         level: "info",
         action: "bulk_delete",
         resource: "whitelist",
-        details: `Bulk deleted ${successCount} whitelist entries (${errorCount} failed)`,
+        details: `Bulk deleted ${successCount} whitelist entries: ${deletedEntries.join(', ')}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`,
         userId: req.user.userId,
         ipAddress: req.ip,
       });
