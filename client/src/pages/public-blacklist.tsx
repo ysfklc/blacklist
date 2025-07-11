@@ -7,6 +7,7 @@ import {
   Hash,
   Link as LinkIcon,
   ExternalLink,
+  Home,
 } from "lucide-react";
 import { FeedLogo } from "@/components/ui/feed-logo";
 
@@ -106,17 +107,27 @@ export default function PublicBlacklist() {
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center">
-            <FeedLogo size="sm" className="mr-3 bg-gray-200 rounded p-1" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Public Blacklist Feeds
-              </h1>
-              <p className="text-gray-600">
-                Download the latest blacklist indicators for your security
-                systems
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <FeedLogo size="sm" className="mr-3 bg-gray-200 rounded p-1" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  Public Blacklist Feeds
+                </h1>
+                <p className="text-gray-600">
+                  Download the latest blacklist indicators for your security
+                  systems
+                </p>
+              </div>
             </div>
+            <a
+              href="/"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-gray-900 transition-colors duration-200"
+              title="Return to Home"
+            >
+              <Home className="h-4 w-4 mr-2" />
+              Home
+            </a>
           </div>
         </div>
       </div>
