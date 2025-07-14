@@ -607,6 +607,13 @@ export class DatabaseStorage implements IStorage {
           whitelistedSet.add(value);
         }
       }
+    } else if (type === 'domain') {
+      // For domains, check exact matches and subdomain matches
+      for (const value of values) {
+        if (this.isDomainWhitelisted(value, whitelistValues)) {
+          whitelistedSet.add(value);
+        }
+      }  
     } else {
       // For other types, use exact matching (original logic)
       const exactMatches = await db
@@ -740,6 +747,11 @@ export class DatabaseStorage implements IStorage {
       return this.isIpWhitelisted(value, whitelistEntries.map(e => e.value));
     }
     
+    // For domains, check exact matches and parent domain matches
+    if (type === 'domain') {
+      return this.isDomainWhitelisted(value, whitelistEntries.map(e => e.value));
+    }
+    
     // For other types, use exact matching
     return whitelistEntries.some(entry => entry.value === value);
   }
@@ -763,6 +775,23 @@ export class DatabaseStorage implements IStorage {
           console.warn(`Invalid CIDR format in whitelist: ${whitelistValue}`);
           continue;
         }
+      }
+    }
+    
+    return false;
+  }
+
+  private isDomainWhitelisted(domain: string, whitelistValues: string[]): boolean {
+    for (const whitelistValue of whitelistValues) {
+      // Check for exact match first
+      if (whitelistValue === domain) {
+        return true;
+      }
+      
+      // Check if domain is a subdomain of whitelisted domain
+      // For example, if test.com.tr is whitelisted, then a.test.com.tr should be blocked
+      if (domain.endsWith('.' + whitelistValue)) {
+        return true;
       }
     }
     
@@ -858,9 +887,40 @@ export class DatabaseStorage implements IStorage {
         }
       } catch (error) {
         console.warn(`Invalid CIDR format: ${value}`);
-      }
+      } 
+    } else if (type === 'domain') {
+      // Handle domain deletion (exact match and subdomain deletion)
+      // Get all domain indicators
+      const allDomains = await db
+        .select({ id: indicators.id, value: indicators.value })
+        .from(indicators)
+        .where(eq(indicators.type, 'domain'));
+
+      // Find domains that match or are subdomains of the whitelisted domain
+      const domainsToDelete = allDomains.filter(domain => {
+        // Exact match
+        if (domain.value === value) {
+          return true;
+        }
+        // Subdomain match
+        if (domain.value.endsWith('.' + value)) {
+          return true;
+        }
+        return false;
+      });
+
+      if (domainsToDelete.length > 0) {
+        const idsToDelete = domainsToDelete.map(domain => domain.id);
+        
+        // Delete indicators
+        await db
+          .delete(indicators)
+          .where(inArray(indicators.id, idsToDelete));
+
+        deletedCount = domainsToDelete.length;
+      }  
     } else {
-      // Handle exact match deletion
+      // Handle exact match deletion for other types
       const result = await db
         .delete(indicators)
         .where(and(
@@ -868,9 +928,9 @@ export class DatabaseStorage implements IStorage {
           eq(indicators.type, type)
         ))
         .returning({ id: indicators.id });
-
+        
       deletedCount = result.length;
-    }
+    } 
 
     return deletedCount;
   }
