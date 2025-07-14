@@ -25,6 +25,11 @@ interface PublicFileStats {
     totalCount: string;
     lastUpdate: string;
   };
+  proxy: {
+    count: number;
+    totalCount: string;
+    lastUpdate: string;
+  };
 }
 
 interface BlacklistFiles {
@@ -363,8 +368,9 @@ export default function PublicLinks() {
               </div>
               <div className="mt-4">
                 <div className="text-sm text-gray-500 space-y-1">
-                  <p>Format: Category-based proxy format</p>
-                  <p>Contains: Domains and URLs</p>
+                  <p>Last updated: <span>{stats?.proxy.lastUpdate || 'Never'}</span></p>
+                  <p>Total entries: <span>{stats?.proxy.totalCount || '0'}</span></p>
+                  <p>Format: Category-based proxy format(Domains and URLs)</p>
                 </div>
                 <div className="mt-3 space-y-1">
                   {files?.Proxy && files.Proxy.length > 0 ? (

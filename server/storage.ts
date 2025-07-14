@@ -114,6 +114,26 @@ export interface IStorage {
   revokeApiToken(id: number, userId: number): Promise<void>;
 }
 
+// Helper function to calculate time difference in human-readable format
+function formatTimeAgo(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSeconds = Math.floor(diffMs / 1000);
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSeconds < 60) {
+    return diffSeconds <= 1 ? "Just now" : `${diffSeconds} sec ago`;
+  } else if (diffMinutes < 60) {
+    return diffMinutes === 1 ? "1 min ago" : `${diffMinutes} min ago`;
+  } else if (diffHours < 24) {
+    return diffHours === 1 ? "1 hour ago" : `${diffHours} hours ago`;
+  } else {
+    return diffDays === 1 ? "1 day ago" : `${diffDays} days ago`;
+  }
+}
+
 export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -234,7 +254,15 @@ export class DatabaseStorage implements IStorage {
       .from(auditLogs)
       .orderBy(desc(auditLogs.createdAt))
       .limit(10);
-
+    
+    // Get the most recent lastFetch time to calculate actual last update
+    const [mostRecentFetch] = await db
+      .select({ lastFetch: dataSources.lastFetch })
+      .from(dataSources)
+      .where(and(eq(dataSources.isActive, true), isNotNull(dataSources.lastFetch)))
+      .orderBy(desc(dataSources.lastFetch))
+      .limit(1);
+  
     const dataSourcesStatus = await db
       .select({
         id: dataSources.id,
@@ -272,7 +300,7 @@ export class DatabaseStorage implements IStorage {
       totalIndicators: totalIndicators.count,
       activeIndicators: activeIndicators.count,
       dataSources: totalDataSources.count,
-      lastUpdate: "2 min ago",
+      lastUpdate: mostRecentFetch?.lastFetch ? formatTimeAgo(new Date(mostRecentFetch.lastFetch)) : "Never",
       indicatorsByType: {
         ip: indicatorTypeMap.ip || 0,
         domain: indicatorTypeMap.domain || 0,
@@ -1059,41 +1087,68 @@ export class DatabaseStorage implements IStorage {
     const [hashCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'hash'), eq(indicators.isActive, true)));
     const [urlCount] = await db.select({ count: count() }).from(indicators).where(and(eq(indicators.type, 'url'), eq(indicators.isActive, true)));
 
-    // Count actual files in each directory
-    const countFiles = (directory: string) => {
+    // Count actual files and get last modification time for each directory
+    const getFileInfo = (directory: string) => {
       try {
         const dirPath = path.join('./public/blacklist', directory);
         if (fs.existsSync(dirPath)) {
           const files = fs.readdirSync(dirPath).filter((file: string) => file.endsWith('.txt'));
-          return files.length;
+          if (files.length === 0) {
+            return { count: 0, lastUpdate: "Never" };
+          }
+
+          // Get the most recent modification time
+          let latestMtime = new Date(0);
+          for (const file of files) {
+            const filePath = path.join(dirPath, file);
+            const stats = fs.statSync(filePath);
+            if (stats.mtime > latestMtime) {
+              latestMtime = stats.mtime;
+            }
+          }
+
+          return {
+            count: files.length,
+            lastUpdate: formatTimeAgo(latestMtime)
+          };
         }
-        return 0;
+        return { count: 0, lastUpdate: "Never" };
       } catch (error) {
-        console.error(`Error counting files in ${directory}:`, error);
-        return 0;
+        console.error(`Error getting file info for ${directory}:`, error);
+        return { count: 0, lastUpdate: "Error" };
       }
     };
 
+    const ipInfo = getFileInfo('IP');
+    const domainInfo = getFileInfo('Domain');
+    const hashInfo = getFileInfo('Hash');
+    const urlInfo = getFileInfo('URL');
+    const proxyInfo = getFileInfo('Proxy');
     return {
       ip: {
-        count: countFiles('IP'),
+        count: ipInfo.count,
         totalCount: ipCount.count.toLocaleString(),
-        lastUpdate: "2 min ago",
+        lastUpdate: ipInfo.lastUpdate,
       },
       domain: {
-        count: countFiles('Domain'),
+        count: domainInfo.count,
         totalCount: domainCount.count.toLocaleString(),
-        lastUpdate: "2 min ago",
+        lastUpdate: domainInfo.lastUpdate,
       },
       hash: {
-        count: countFiles('Hash'),
+        count: hashInfo.count,
         totalCount: hashCount.count.toLocaleString(),
-        lastUpdate: "2 min ago",
+        lastUpdate: hashInfo.lastUpdate,
       },
       url: {
-        count: countFiles('URL'),
+        count: urlInfo.count,
         totalCount: urlCount.count.toLocaleString(),
-        lastUpdate: "2 min ago",
+        lastUpdate: urlInfo.lastUpdate,
+      },
+      proxy: {
+        count: proxyInfo.count,
+        totalCount: (domainCount.count + urlCount.count).toLocaleString(),
+        lastUpdate: proxyInfo.lastUpdate,
       },
     };
   }
