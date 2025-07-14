@@ -5,6 +5,10 @@ import { initializeDatabase } from "./init";
 import { initializeScheduler } from "./scheduler";
 
 const app = express();
+
+// Trust proxy headers to get real client IP addresses
+app.set('trust proxy', true);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

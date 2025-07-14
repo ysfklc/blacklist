@@ -12,6 +12,7 @@ import path from "path";
 import { fetchAndParseData } from "./fetcher";
 import CIDR from "ip-cidr";
 import { ldapService } from "./ldap";
+import { getClientIP } from "./utils";
 
 // Enhanced indicator type detection patterns
 const IP_REGEX = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
@@ -61,8 +62,8 @@ function detectWhitelistType(value: string): { type: string; hashType?: string; 
     return { type: 'error', error: 'Value cannot be empty' };
   }
   
-  if (trimmedValue.length > 2048) {
-    return { type: 'error', error: 'Value is too long (maximum 2048 characters)' };
+  if (trimmedValue.length > 65535) {
+    return { type: 'error', error: 'Value is too long (maximum 65535 characters)' };
   }
   
   // IP address check (including CIDR notation for whitelist)
@@ -288,7 +289,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // IP-based access control middleware
 function checkIPAccess(req: any, res: any, next: any) {
-  const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const clientIP = getClientIP(req);
   
   console.log(`[IP ACCESS] Checking access for IP: ${clientIP}`);
   console.log(`[IP ACCESS] Headers:`, req.headers);
@@ -399,7 +400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resource: "authentication",
         details: `Successful login via ${authType} authentication`,
         userId: user.id,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({
@@ -425,7 +426,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resource: "authentication",
         details: "User logged out",
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
       res.json({ message: "Logged out successfully" });
     } catch (error) {
@@ -496,7 +497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: user.id.toString(),
         details: `Created new user: ${user.username}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.status(201).json({
@@ -533,7 +534,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Updated user: ${user.username}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({
@@ -566,7 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Deleted user`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "User deleted" });
@@ -631,7 +632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: req.user.userId.toString(),
         details: "Password updated",
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Password updated successfully" });
@@ -744,7 +745,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: dataSource.id.toString(),
         details: `Created new data source: ${dataSource.name}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.status(201).json(dataSource);
@@ -768,7 +769,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Updated data source: ${dataSource.name}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json(dataSource);
@@ -789,7 +790,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Deleted data source`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Data source deleted" });
@@ -812,7 +813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Paused data source`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Data source paused successfully" });
@@ -835,7 +836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Resumed data source`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Data source resumed successfully" });
@@ -873,7 +874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Manual fetch triggered for data source: ${dataSource.name}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       // Trigger the fetch (don't await - run in background)
@@ -1051,7 +1052,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           resource: "indicator",
           details: `Whitelist blocked indicator: ${validatedData.value}`,
           userId: req.user.userId,
-          ipAddress: req.ip,
+          ipAddress: getClientIP(req),
         });
         return res.status(400).json({ error: "Indicator is whitelisted" });
       }
@@ -1083,7 +1084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: indicator.id.toString(),
         details: `Created new indicator: ${indicator.value} (${detectedType.type})${durationHours ? ` with ${durationHours}h duration` : ''}${notes ? ' with notes' : ''}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.status(201).json(indicator);
@@ -1119,7 +1120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Updated indicator: ${indicator.value}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json(indicator);
@@ -1145,7 +1146,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Deleted indicator ${indicatorValue}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Indicator deleted" });
@@ -1201,7 +1202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: note.id.toString(),
         details: `Added note to indicator ${indicatorId}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json(note);
@@ -1232,7 +1233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: noteId.toString(),
         details: `Updated note`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json(note);
@@ -1257,7 +1258,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: noteId.toString(),
         details: `Deleted note`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Note deleted" });
@@ -1374,7 +1375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: entry.id.toString(),
         details: `Added to whitelist: ${entry.value}${deletedCount > 0 ? ` (deleted ${deletedCount} matching indicator${deletedCount > 1 ? 's' : ''})` : ''}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.status(201).json({ ...entry, deletedIndicators: deletedCount });
@@ -1405,7 +1406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Removed from whitelist: ${whitelistEntry.value} (${whitelistEntry.type})`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Whitelist entry deleted" });
@@ -1452,7 +1453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resource: "whitelist",
         details: `Bulk deleted ${successCount} whitelist entries: ${deletedEntries.join(', ')}${errorCount > 0 ? ` (${errorCount} failed)` : ''}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ 
@@ -1607,7 +1608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resource: "settings",
         details: "Updated system settings",
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Settings updated" });
@@ -1633,7 +1634,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resource: "ldap",
         details: `LDAP connection test to ${server}:${port}`,
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "LDAP connection test successful" });
@@ -1722,7 +1723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resource: "blacklist",
         details: "Manually triggered blacklist refresh",
         userId: req.user.userId,
-        ipAddress: req.ip,
+        ipAddress: getClientIP(req),
       });
 
       res.json({ message: "Blacklist refresh initiated" });
@@ -1771,7 +1772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: newToken.id.toString(),
         details: `Created API token: ${name}`,
         userId: (req as AuthRequest).user.userId,
-        ipAddress: req.ip || req.connection.remoteAddress
+        ipAddress: getClientIP(req)
       });
 
       res.status(201).json({ ...newToken, token }); // Return full token only on creation
@@ -1793,7 +1794,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Deleted API token`,
         userId: (req as AuthRequest).user.userId,
-        ipAddress: req.ip || req.connection.remoteAddress
+        ipAddress: getClientIP(req)
       });
 
       res.json({ message: "Token deleted successfully" });
@@ -1815,7 +1816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id.toString(),
         details: `Revoked API token`,
         userId: (req as AuthRequest).user.userId,
-        ipAddress: req.ip || req.connection.remoteAddress
+        ipAddress: getClientIP(req)
       });
 
       res.json({ message: "Token revoked successfully" });
@@ -1826,7 +1827,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // IP information endpoint
   app.get("/api/my-ip", (req, res) => {
-    const clientIP = req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const clientIP = getClientIP(req);
     res.json({ ip: clientIP });
   });
 
