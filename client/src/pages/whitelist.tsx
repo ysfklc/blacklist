@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 
 const whitelistSchema = z.object({
-  value: z.string().min(1, "Value is required"),
+  value: z.string().min(1, "Value is required").max(65535, "Value is too long (maximum 65535 characters)"),
   type: z.enum(["ip", "domain", "hash", "url"]),
   reason: z.string().optional(),
 });

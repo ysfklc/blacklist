@@ -51,45 +51,108 @@ const INVALID_URLS = [
 
 function detectWhitelistType(value: string): { type: string; hashType?: string; error?: string } | null {
   if (!value || typeof value !== 'string') {
-    return null;
+    return { type: 'error', error: 'Value is required and must be a string' };
   }
   
   const trimmedValue = value.trim();
   
   // Basic format validation
   if (trimmedValue.length === 0) {
-    return null;
+    return { type: 'error', error: 'Value cannot be empty' };
   }
   
-  // IP address check (more permissive for whitelist)
+  if (trimmedValue.length > 2048) {
+    return { type: 'error', error: 'Value is too long (maximum 2048 characters)' };
+  }
+  
+  // IP address check (including CIDR notation for whitelist)
   const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:\/(?:[0-9]|[1-2][0-9]|3[0-2]))?$/;
   if (ipRegex.test(trimmedValue)) {
+    // Extract IP part for validation (remove CIDR if present)
+    const ipPart = trimmedValue.split('/')[0];
+    
+    // Check for invalid IP addresses
+    if (ipPart === '0.0.0.0' || ipPart === '255.255.255.255') {
+      return { type: 'error', error: `IP address ${ipPart} is not a valid IP address` };
+    }
+    
+    // For whitelist, we allow private/reserved IPs as they might be legitimate internal assets
+    // but we still validate the format
+    if (trimmedValue.includes('/')) {
+      try {
+        new CIDR(trimmedValue);
+      } catch (error) {
+        return { type: 'error', error: 'Invalid CIDR notation format' };
+      }
+    }
+    
     return { type: 'ip' };
   }
   
-  // Domain check
-  const domainRegex = /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$/;
-  if (domainRegex.test(trimmedValue) && trimmedValue.includes('.')) {
+  // Domain check with enhanced validation
+  if (DOMAIN_REGEX.test(trimmedValue)) {
+    // Check for invalid domain patterns
+    for (const invalidPattern of INVALID_DOMAINS) {
+      if (invalidPattern.test(trimmedValue)) {
+        return { type: 'error', error: `Domain ${trimmedValue} uses an invalid or reserved TLD` };
+      }
+    }
+    
+    // Additional domain validation
+    if (trimmedValue.length > 253) {
+      return { type: 'error', error: 'Domain name is too long (maximum 253 characters)' };
+    }
+    
+    // Check for valid TLD
+    const parts = trimmedValue.split('.');
+    if (parts.length < 2) {
+      return { type: 'error', error: 'Domain must have at least one dot and a valid TLD' };
+    }
+    
+    const tld = parts[parts.length - 1];
+    if (tld.length < 2 || !/^[a-zA-Z]+$/.test(tld)) {
+      return { type: 'error', error: 'Domain must have a valid TLD (at least 2 letters)' };
+    }
+    
     return { type: 'domain' };
   }
   
-  // Hash check
+  // Hash check with validation
   const hashType = detectHashType(trimmedValue);
-  if (hashType) {
+  if (hashType && hashType !== "unknown") {
+    // Validate hash format
+    if (!/^[a-fA-F0-9]+$/.test(trimmedValue)) {
+      return { type: 'error', error: 'Hash must contain only hexadecimal characters' };
+    }
+    
     return { type: 'hash', hashType };
   }
   
-  // URL check
+  // URL check with enhanced validation
   try {
     const url = new URL(trimmedValue);
     if (url.protocol === 'http:' || url.protocol === 'https:') {
+      // Check for invalid URL patterns
+      for (const invalidPattern of INVALID_URLS) {
+        if (invalidPattern.test(trimmedValue)) {
+          return { type: 'error', error: `URL ${trimmedValue} points to a private/reserved address` };
+        }
+      }
+      
+      // Additional URL validation
+      if (trimmedValue.length > 2048) {
+        return { type: 'error', error: 'URL is too long (maximum 2048 characters)' };
+      }
+      
       return { type: 'url' };
+    } else {
+      return { type: 'error', error: 'URL must use HTTP or HTTPS protocol' };
     }
   } catch (e) {
-    // Not a valid URL
+    // Not a valid URL, continue to final check
   }
   
-  return null;
+  return { type: 'error', error: 'Value does not match any valid pattern (IP, domain, hash, or URL)' };
 }
 
 function detectIndicatorType(value: string): { type: string; hashType?: string; error?: string } | null {
@@ -1068,7 +1131,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/indicators/:id", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-                  
+      
       // Get the indicator details before deletion for logging
       const indicator = await storage.getIndicatorById(id);
       
@@ -1229,17 +1292,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Auto-detect type if not provided
+      // Auto-detect type if not provided, or validate provided type
       let finalType = type;
+      let detectedType;
+      
       if (!type) {
-        const detectedType = detectWhitelistType(value);
+        detectedType = detectWhitelistType(value);
         if (!detectedType) {
           return res.status(400).json({ 
             error: "Invalid whitelist value", 
             details: "The provided value does not match any recognized pattern (IP, domain, hash, or URL)" 
           });
         }
+        
+        // Check if detection returned an error
+        if (detectedType.type === 'error') {
+          return res.status(400).json({ 
+            error: "Invalid whitelist value", 
+            details: detectedType.error 
+          });
+        }
+        
         finalType = detectedType.type;
+      } else {
+        // Validate the provided type and value combination
+        detectedType = detectWhitelistType(value);
+        if (!detectedType) {
+          return res.status(400).json({ 
+            error: "Invalid whitelist value", 
+            details: "The provided value does not match any recognized pattern (IP, domain, hash, or URL)" 
+          });
+        }
+        
+        // Check if detection returned an error
+        if (detectedType.type === 'error') {
+          return res.status(400).json({ 
+            error: "Invalid whitelist value", 
+            details: detectedType.error 
+          });
+        }
+        
+        // Verify that the provided type matches the detected type
+        if (type !== detectedType.type) {
+          return res.status(400).json({ 
+            error: "Type mismatch", 
+            details: `Provided type "${type}" does not match detected type "${detectedType.type}" for value "${value}"` 
+          });
+        }
+        
+        finalType = type;
       }
       
       const validatedData = insertWhitelistSchema.parse({
