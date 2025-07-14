@@ -1068,14 +1068,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/indicators/:id", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+                  
+      // Get the indicator details before deletion for logging
+      const indicator = await storage.getIndicatorById(id);
+      
       await storage.deleteIndicator(id);
       
+      const indicatorValue = indicator?.value || "unknown";
       await storage.createAuditLog({
         level: "info",
         action: "delete",
         resource: "indicator",
         resourceId: id.toString(),
-        details: `Deleted indicator`,
+        details: `Deleted indicator ${indicatorValue}`,
         userId: req.user.userId,
         ipAddress: req.ip,
       });

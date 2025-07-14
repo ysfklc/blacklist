@@ -62,6 +62,7 @@ export interface IStorage {
   // Indicator operations
   getIndicators(page: number, limit: number, filters: any): Promise<any>;
   createIndicator(indicator: InsertIndicator): Promise<Indicator>;
+  getIndicatorById(id: number): Promise<Indicator | undefined>;  
   getIndicatorByValue(value: string): Promise<Indicator | undefined>;
   getIndicatorByValueCaseInsensitive(value: string): Promise<Indicator | undefined>;
   createOrUpdateIndicator(indicator: Partial<InsertIndicator>): Promise<Indicator>;
@@ -427,6 +428,15 @@ export class DatabaseStorage implements IStorage {
       .values(indicator)
       .returning();
     return created;
+  }
+
+  async getIndicatorById(id: number): Promise<Indicator | undefined> {
+    const [result] = await db
+      .select()
+      .from(indicators)
+      .where(eq(indicators.id, id))
+      .limit(1);
+    return result;
   }
 
   async getIndicatorByValue(value: string): Promise<Indicator | undefined> {
