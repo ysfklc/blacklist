@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState , useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,10 +31,21 @@ export default function AuditLogs() {
     startDate: "",
     endDate: "",
   });
+  const [userInput, setUserInput] = useState(""); // Local state for user input
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const { user } = useAuth();
   const { toast } = useToast();
+
+  // Debounce the user filter with 500ms delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => ({ ...prev, user: userInput }));
+      setPage(1); // Reset to first page when filtering
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [userInput]);
 
   const { data: logs, isLoading } = useQuery({
     queryKey: ["/api/audit-logs", page, pageSize, filters],
@@ -192,8 +203,8 @@ export default function AuditLogs() {
               <div>
                 <Input
                   placeholder="User"
-                  value={filters.user}
-                  onChange={(e) => setFilters({ ...filters, user: e.target.value })}
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
                 />
               </div>
               <div>
