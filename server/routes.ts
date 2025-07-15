@@ -1129,7 +1129,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/indicators/:id", authenticateToken, requireRole(["admin"]), async (req, res) => {
+  app.delete("/api/indicators/:id", authenticateTokenOrApiKey, requireRole(["admin"]), async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       
