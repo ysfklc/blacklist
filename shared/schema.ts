@@ -14,6 +14,8 @@ export const users = pgTable("users", {
   authType: text("auth_type").notNull().default("local"), // local, ldap
   isActive: boolean("is_active").notNull().default(true),
   lastLogin: timestamp("last_login"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -28,6 +30,8 @@ export const dataSources = pgTable("data_sources", {
   lastFetch: timestamp("last_fetch"),
   lastFetchStatus: text("last_fetch_status"), // success, error
   lastFetchError: text("last_fetch_error"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: integer("created_by").references(() => users.id),
 });
@@ -41,6 +45,8 @@ export const indicators = pgTable("indicators", {
   sourceId: integer("source_id").references(() => dataSources.id),
   isActive: boolean("is_active").notNull().default(true),
   tempActiveUntil: timestamp("temp_active_until"),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   createdBy: integer("created_by").references(() => users.id),
@@ -52,6 +58,8 @@ export const whitelist = pgTable("whitelist", {
   type: text("type").notNull(), // ip, domain, hash, url, soar-url
   reason: text("reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
   createdBy: integer("created_by").references(() => users.id),
 });
 
@@ -74,6 +82,8 @@ export const settings = pgTable("settings", {
   value: text("value").notNull(),
   encrypted: boolean("encrypted").notNull().default(false),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
   updatedBy: integer("updated_by").references(() => users.id),
 });
 
@@ -92,6 +102,8 @@ export const indicatorNotes = pgTable("indicator_notes", {
   isEdited: boolean("is_edited").notNull().default(false),
   editedAt: timestamp("edited_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  isDeleted: boolean("is_deleted").notNull().default(false),
+  deletedAt: timestamp("deleted_at"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
@@ -204,6 +216,8 @@ export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
   lastLogin: true,
+  isDeleted: true,
+  deletedAt: true,
 });
 
 export const insertDataSourceSchema = createInsertSchema(dataSources).omit({
@@ -212,17 +226,23 @@ export const insertDataSourceSchema = createInsertSchema(dataSources).omit({
   lastFetch: true,
   lastFetchStatus: true,
   lastFetchError: true,
+  isDeleted: true,
+  deletedAt: true,
 });
 
 export const insertIndicatorSchema = createInsertSchema(indicators).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  isDeleted: true,
+  deletedAt: true,
 });
 
 export const insertWhitelistSchema = createInsertSchema(whitelist).omit({
   id: true,
   createdAt: true,
+  isDeleted: true,
+  deletedAt: true,
 });
 
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
@@ -233,6 +253,8 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 export const insertSettingSchema = createInsertSchema(settings).omit({
   id: true,
   updatedAt: true,
+  isDeleted: true,
+  deletedAt: true,
 });
 
 export const insertSessionSchema = createInsertSchema(sessions).omit({
@@ -245,6 +267,8 @@ export const insertIndicatorNoteSchema = createInsertSchema(indicatorNotes).omit
   updatedAt: true,
   isEdited: true,
   editedAt: true,
+  isDeleted: true,
+  deletedAt: true,
 });
 
 export const insertWhitelistBlockSchema = createInsertSchema(whitelistBlocks).omit({

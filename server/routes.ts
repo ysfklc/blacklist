@@ -509,8 +509,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdAt: user.createdAt,
       });
     } catch (error) {
+      console.error("Error creating user:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid data", details: error.errors });
+      }
+      // Check for database constraint errors (like duplicate username)
+      if (error && typeof error === 'object' && 'code' in error) {
+        if (error.code === '23505') { // PostgreSQL unique constraint violation
+          return res.status(409).json({ 
+            error: "Username already exists",
+            details: "A user with this username already exists. Please choose a different username."
+          });
+        }
       }
       res.status(500).json({ error: "Internal server error" });
     }
@@ -589,10 +599,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const id = parseInt(req.params.id);
       
-      if (id === req.user.userId) {
+      if (id === (req as AuthRequest).user.userId) {
         return res.status(400).json({ error: "Cannot delete your own account" });
       }
       
+      // Get user data before deletion for audit log
+      const userToDelete = await storage.getUser(id);
+      if (!userToDelete) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+
       await storage.deleteUser(id);
       
       await storage.createAuditLog({
@@ -600,13 +617,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "delete",
         resource: "user",
         resourceId: id.toString(),
-        details: `Deleted user: ${originalUser?.username || 'unknown'}`,
+        details: `Soft deleted user: ${userToDelete.username}`,
         userId: req.user.userId,
         ipAddress: getClientIP(req),
       });
 
-      res.json({ message: "User deleted" });
+      res.json({ message: "User deleted successfully" });
     } catch (error) {
+      console.error("Error deleting user:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });
@@ -1229,19 +1247,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const note = await storage.createIndicatorNote(validatedData);
+      // Get indicator details for better audit logging
+      const indicator = await storage.getIndicatorById(indicatorId);
+      const indicatorValue = indicator ? indicator.value : `ID ${indicatorId}`;
       
       await storage.createAuditLog({
         level: "info",
         action: "create",
         resource: "indicator_note",
         resourceId: note.id.toString(),
-        details: `Added note to indicator ${indicatorId}`,
+        details: `Added note to indicator ${indicatorValue}: "${validatedData.content}"`,
         userId: req.user.userId,
         ipAddress: getClientIP(req),
       });
 
       res.json(note);
     } catch (error) {
+      console.error("Error creating indicator note:", error);
       if (error instanceof z.ZodError) {
         res.status(400).json({ error: "Invalid data", details: error.errors });
       } else {
@@ -1261,12 +1283,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const note = await storage.updateIndicatorNote(noteId, content, req.user.userId);
       
+      // Get indicator details for better audit logging
+      const indicator = await storage.getIndicatorById(note.indicatorId);
+      const indicatorValue = indicator ? indicator.value : `ID ${note.indicatorId}`;
+      
       await storage.createAuditLog({
         level: "info",
         action: "update",
         resource: "indicator_note",
         resourceId: noteId.toString(),
-        details: `Updated note`,
+        details: `Updated note for indicator ${indicatorValue}: "${content}"`,
         userId: req.user.userId,
         ipAddress: getClientIP(req),
       });
@@ -1284,6 +1310,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/indicator-notes/:id", authenticateToken, requireRole(["admin", "user", "reporter"]), async (req, res) => {
     try {
       const noteId = parseInt(req.params.id);
+      // Get note details before deletion for better audit logging
+      const noteToDelete = await storage.getIndicatorNoteById(noteId);
+      let indicatorValue = `ID ${noteId}`;
+      let noteContent = "unknown";
+      
+      if (noteToDelete) {
+        const indicator = await storage.getIndicatorById(noteToDelete.indicatorId);
+        indicatorValue = indicator ? indicator.value : `ID ${noteToDelete.indicatorId}`;
+        noteContent = noteToDelete.content;
+      }
+
       await storage.deleteIndicatorNote(noteId, req.user.userId);
       
       await storage.createAuditLog({
@@ -1291,7 +1328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "delete",
         resource: "indicator_note",
         resourceId: noteId.toString(),
-        details: `Deleted note`,
+        details: `Deleted note from indicator ${indicatorValue}: "${noteContent}"`,   
         userId: req.user.userId,
         ipAddress: getClientIP(req),
       });

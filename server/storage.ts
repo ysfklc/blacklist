@@ -102,6 +102,7 @@ export interface IStorage {
 
   // Indicator notes operations
   getIndicatorNotes(indicatorId: number): Promise<any[]>;
+  getIndicatorNoteById(id: number): Promise<IndicatorNote | undefined>;
   createIndicatorNote(note: InsertIndicatorNote): Promise<IndicatorNote>;
   updateIndicatorNote(id: number, content: string, userId: number): Promise<IndicatorNote>;
   deleteIndicatorNote(id: number, userId: number): Promise<void>;
@@ -137,12 +138,14 @@ function formatTimeAgo(date: Date): string {
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db.select().from(users)
+      .where(and(eq(users.id, id), eq(users.isDeleted, false)));
     return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
+    const [user] = await db.select().from(users)
+      .where(and(eq(users.username, username), eq(users.isDeleted, false)));
     return user || undefined;
   }
 
@@ -162,7 +165,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
+    return await db.select().from(users)
+      .where(eq(users.isDeleted, false))
+      .orderBy(desc(users.createdAt));
   }
 
   async updateUser(id: number, data: Partial<User>): Promise<User> {
@@ -175,36 +180,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteUser(id: number): Promise<void> {
-    // First, update all foreign key references to null or handle them appropriately
-    // Update indicators created by this user to null
-    await db.update(indicators)
-      .set({ createdBy: null })
-      .where(eq(indicators.createdBy, id));
+    // Soft delete the user - keep all their data intact but mark as deleted
+    const deletedAt = new Date();
     
-    // Update data sources created by this user to null
-    await db.update(dataSources)
-      .set({ createdBy: null })
-      .where(eq(dataSources.createdBy, id));
+    // Get the user to modify their username for unique constraint
+    const userToDelete = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    if (userToDelete.length === 0) {
+      throw new Error("User not found");
+    }
     
-    // Update whitelist entries created by this user to null
-    await db.update(whitelist)
-      .set({ createdBy: null })
-      .where(eq(whitelist.createdBy, id));
+    const originalUsername = userToDelete[0].username;
+    const deletedUsername = `${originalUsername}_deleted_${deletedAt.getTime()}`;
     
-    // Delete indicator notes created by this user
-    await db.delete(indicatorNotes)
-      .where(eq(indicatorNotes.userId, id));
-    
-    // Delete audit logs for this user
-    await db.delete(auditLogs)
-      .where(eq(auditLogs.userId, id));
-    
-    // Delete sessions for this user
+    // Mark the user as deleted and modify username to avoid unique constraint issues
+    await db.update(users)
+      .set({ 
+        isDeleted: true, 
+        deletedAt: deletedAt,
+        isActive: false, // Also deactivate the user
+        username: deletedUsername // Modify username to allow recreation
+      })
+      .where(eq(users.id, id));
+
+    // Hard delete only sessions and API tokens as specified
     await db.delete(sessions)
       .where(eq(sessions.userId, id));
-    
-    // Finally, delete the user
-    await db.delete(users).where(eq(users.id, id));
+
+    await db.delete(apiTokens)
+      .where(eq(apiTokens.userId, id));
+
+    // Keep all other data (indicators, dataSources, whitelist, indicatorNotes, auditLogs, settings)
+    // but marked with the original created_by relationship intact for audit purposes
   }
 
   async updateUserPassword(id: number, hashedPassword: string): Promise<void> {
@@ -1187,6 +1193,16 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(indicatorNotes.createdAt));
 
     return notes;
+  }
+
+  async getIndicatorNoteById(id: number): Promise<IndicatorNote | undefined> {
+    const [note] = await db
+      .select()
+      .from(indicatorNotes)
+      .where(eq(indicatorNotes.id, id))
+      .limit(1);
+    
+    return note || undefined;
   }
 
   async createIndicatorNote(note: InsertIndicatorNote): Promise<IndicatorNote> {
