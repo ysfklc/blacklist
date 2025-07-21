@@ -618,7 +618,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resource: "user",
         resourceId: id.toString(),
         details: `Soft deleted user: ${userToDelete.username}`,
-        userId: req.user.userId,
+        userId: (req as AuthRequest).user.userId,
         ipAddress: getClientIP(req),
       });
 
