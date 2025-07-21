@@ -56,9 +56,10 @@ export async function initializeDatabase(): Promise<void> {
       { key: "proxyFormat.urlCategory", value: "blocked_urls" }
     ];
     
-    // Initialize SOAR-URL setting if it doesn't exist
-    const soarUrlSetting = [
-      { key: "system.enableSoarUrl", value: "false" }
+    // Initialize SOAR-URL and Log Retention settings if they don't exist
+    const additionalSettings = [
+      { key: "system.enableSoarUrl", value: "false" },
+      { key: "system.logRetention", value: "90" }
     ];
 
     for (const setting of proxyFormatSettings) {
@@ -77,8 +78,8 @@ export async function initializeDatabase(): Promise<void> {
       }
     }
     
-        // Initialize SOAR-URL setting
-    for (const setting of soarUrlSetting) {
+    // Initialize additional settings
+    for (const setting of additionalSettings) {
       const existing = await db
         .select()
         .from(settings)
@@ -94,7 +95,7 @@ export async function initializeDatabase(): Promise<void> {
       }
     }
     
-    console.log("Proxy format and SOAR-URL settings initialized");
+    console.log("Proxy format, SOAR-URL, and log retention settings initialized");
     console.log("Database initialization complete");
     
   } catch (error) {

@@ -91,6 +91,7 @@ export interface IStorage {
   // Audit log operations
   getAuditLogs(page: number, limit: number, filters: any): Promise<any>;
   createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  cleanupOldAuditLogs(retentionDays: number): Promise<number>;
 
   // Settings operations
   getSettings(): Promise<Setting[]>;
@@ -1031,6 +1032,18 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
+  async cleanupOldAuditLogs(retentionDays: number): Promise<number> {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+
+    const result = await db
+      .delete(auditLogs)
+      .where(sql`${auditLogs.createdAt} < ${cutoffDate}`)
+      .returning({ id: auditLogs.id });
+
+    return result.length;
+  }
+  
   async getSettings(): Promise<Setting[]> {
     const allSettings = await db.select().from(settings);
     
