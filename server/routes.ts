@@ -521,19 +521,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const id = parseInt(req.params.id);
       const updateData = req.body;
       
+      // Get the original user data to track changes
+      const originalUser = await storage.getUser(id);
+      if (!originalUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Track what fields are being changed
+      const changedFields = [];
+      if (updateData.username && updateData.username !== originalUser.username) {
+        changedFields.push(`username: "${originalUser.username}" → "${updateData.username}"`);
+      }
+      if (updateData.firstName && updateData.firstName !== originalUser.firstName) {
+        changedFields.push(`firstName: "${originalUser.firstName || 'null'}" → "${updateData.firstName}"`);
+      }
+      if (updateData.lastName && updateData.lastName !== originalUser.lastName) {
+        changedFields.push(`lastName: "${originalUser.lastName || 'null'}" → "${updateData.lastName}"`);
+      }
+      if (updateData.email && updateData.email !== originalUser.email) {
+        changedFields.push(`email: "${originalUser.email || 'null'}" → "${updateData.email}"`);
+      }
+      if (updateData.role && updateData.role !== originalUser.role) {
+        changedFields.push(`role: "${originalUser.role}" → "${updateData.role}"`);
+      }
+      if (updateData.authType && updateData.authType !== originalUser.authType) {
+        changedFields.push(`authType: "${originalUser.authType}" → "${updateData.authType}"`);
+      }
+      if (typeof updateData.isActive === 'boolean' && updateData.isActive !== originalUser.isActive) {
+        changedFields.push(`isActive: ${originalUser.isActive} → ${updateData.isActive}`);
+      }
       if (updateData.password) {
+        changedFields.push('password: [changed]');
         updateData.password = await hashPassword(updateData.password);
       }
       
       const user = await storage.updateUser(id, updateData);
+      
+      // Create detailed audit log entry
+      const auditDetails = changedFields.length > 0 
+        ? `Updated user "${user.username}": ${changedFields.join(', ')}`
+        : `Updated user "${user.username}": no changes detected`;
       
       await storage.createAuditLog({
         level: "info",
         action: "update",
         resource: "user",
         resourceId: id.toString(),
-        details: `Updated user: ${user.username}`,
-        userId: req.user.userId,
+        details: auditDetails,
+        userId: (req as AuthRequest).user.userId,
         ipAddress: getClientIP(req),
       });
 
@@ -565,7 +600,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         action: "delete",
         resource: "user",
         resourceId: id.toString(),
-        details: `Deleted user`,
+        details: `Deleted user: ${originalUser?.username || 'unknown'}`,
         userId: req.user.userId,
         ipAddress: getClientIP(req),
       });
@@ -1600,14 +1635,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/settings", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
       console.log('Settings update request:', req.body);
-      await storage.updateSettings(req.body, req.user.userId);
+            
+      // Get current settings to track changes
+      const currentSettings = await storage.getSettings();
+      const currentSettingsMap = Object.fromEntries(currentSettings.map(s => [s.key, s.value]));
+      
+      // Track which settings are being changed
+      const changedSettings = [];
+      for (const [key, newValue] of Object.entries(req.body)) {
+        const currentValue = currentSettingsMap[key];
+        if (currentValue !== newValue) {
+          // Don't log sensitive values like passwords in detail
+          if (key.toLowerCase().includes('password') || key.toLowerCase().includes('secret')) {
+            changedSettings.push(`${key}: [changed]`);
+          } else {
+            changedSettings.push(`${key}: "${currentValue || 'undefined'}" → "${newValue}"`);
+          }
+        }
+      }
+      
+      await storage.updateSettings(req.body, (req as AuthRequest).user.userId);
+      
+      // Create detailed audit log entry
+      const auditDetails = changedSettings.length > 0 
+        ? `Updated system settings: ${changedSettings.join(', ')}`
+        : "Updated system settings: no changes detected";
       
       await storage.createAuditLog({
         level: "info",
         action: "update",
         resource: "settings",
-        details: "Updated system settings",
-        userId: req.user.userId,
+        details: auditDetails,
+        userId: (req as AuthRequest).user.userId,
         ipAddress: getClientIP(req),
       });
 
