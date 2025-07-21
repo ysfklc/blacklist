@@ -60,17 +60,31 @@ export default function ApiDocsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Your IP address is not authorized to access the API documentation.
+                {errorMessage.includes("Insufficient permissions") 
+                  ? "You don't have permission to access the API documentation. Only Admin and User roles can access this page."
+                  : "Your IP address is not authorized to access the API documentation."
+                }
               </p>
-              <div className="bg-muted p-3 rounded-lg">
-                <p className="text-sm font-medium">Your IP Address:</p>
-                <code className="text-sm font-mono">{ipAddress}</code>
-              </div>
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
-                <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  <strong>To fix this:</strong> Go to Settings → API Documentation Access Control and add your IP address ({ipAddress}) to the allowed list.
-                </p>
-              </div>
+              {!errorMessage.includes("Insufficient permissions") && (
+                <>
+                  <div className="bg-muted p-3 rounded-lg">
+                    <p className="text-sm font-medium">Your IP Address:</p>
+                    <code className="text-sm font-mono">{ipAddress}</code>
+                  </div>
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      <strong>To fix this:</strong> Go to Settings → API Documentation Access Control and add your IP address ({ipAddress}) to the allowed list.
+                    </p>
+                  </div>
+                </>
+              )}
+              {errorMessage.includes("Insufficient permissions") && (
+                <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    <strong>Permission denied:</strong> API documentation is restricted to Admin and User roles. Reporter users cannot access this section.
+                  </p>
+                </div>
+              )}
               <p className="text-sm text-muted-foreground">
                 Error details: {errorMessage}
               </p>

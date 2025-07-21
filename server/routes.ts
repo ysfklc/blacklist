@@ -1832,9 +1832,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // API documentation access control route
-  app.get("/api-docs", checkIPAccess, (req, res) => {
-    // This route is handled by the frontend routing
-    // The IP check is applied to ensure only allowed IPs can access it
+  app.get("/api-docs", checkIPAccess, authenticateTokenOrApiKey, requireRole(["admin", "user"]), (req, res) => {
+    // This route requires both IP access control and authentication with admin/user role
+    // Reporter role is not allowed to access API documentation
     res.status(200).json({ message: "API documentation access granted" });
   });
 
