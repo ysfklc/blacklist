@@ -111,11 +111,36 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
           },
           signal: controller.signal,
           keepalive: false,
-          agent,
         };
-        
-        const response = await fetch(source.url, fetchOptions);
 
+        // Add agent if configured
+        if (agent) {
+          fetchOptions.agent = agent;
+        }
+
+        // For direct HTTPS without proxy but with certificate errors ignored
+        let originalTlsReject: string | undefined;
+        if (source.ignoreCertificateErrors && source.url.startsWith('https:') && !proxySettings.enabled) {
+          // Store original value and set to ignore certificate errors
+          originalTlsReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+          process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+          console.log(`[FETCH] Set NODE_TLS_REJECT_UNAUTHORIZED=0 for ${source.name}`);
+        }
+        
+        let response;
+        try {
+          response = await fetch(source.url, fetchOptions);
+        } finally {
+          // Restore original TLS setting if we changed it
+          if (originalTlsReject !== undefined) {
+            process.env.NODE_TLS_REJECT_UNAUTHORIZED = originalTlsReject;
+            console.log(`[FETCH] Restored NODE_TLS_REJECT_UNAUTHORIZED for ${source.name}`);
+          } else if (source.ignoreCertificateErrors && source.url.startsWith('https:') && !proxySettings.enabled) {
+            delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+            console.log(`[FETCH] Removed NODE_TLS_REJECT_UNAUTHORIZED for ${source.name}`);
+          }
+        }
+        
         clearTimeout(timeoutId);
 
         console.log(`[FETCH] Response received: ${response.status} ${response.statusText}`);
