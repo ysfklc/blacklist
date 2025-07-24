@@ -2,6 +2,8 @@ import { DataSource } from "@shared/schema";
 import { storage } from "./storage";
 import { HttpProxyAgent } from "http-proxy-agent";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import https from "https";
+import http from "http";
 
 interface ParsedIndicators {
   ips: string[];
