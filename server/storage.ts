@@ -29,7 +29,7 @@ import {
   type InsertApiToken
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, ilike, desc, count, sql, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, or, ilike, desc, asc, count, sql, inArray, isNotNull } from "drizzle-orm";
 import * as fs from 'fs';
 import * as path from 'path';
 import CIDR from "ip-cidr";
@@ -60,7 +60,7 @@ export interface IStorage {
   resumeDataSource(id: number): Promise<void>;
 
   // Indicator operations
-  getIndicators(page: number, limit: number, filters: any): Promise<any>;
+  getIndicators(page: number, limit: number, filters: any, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<any>;
   createIndicator(indicator: InsertIndicator): Promise<Indicator>;
   getIndicatorById(id: number): Promise<Indicator | undefined>;  
   getIndicatorByValue(value: string): Promise<Indicator | undefined>;
@@ -391,7 +391,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(dataSources.id, id));
   }
 
-  async getIndicators(page: number, limit: number, filters: any): Promise<any> {
+  async getIndicators(page: number, limit: number, filters: any, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<any> {
     const offset = (page - 1) * limit;
     const conditions = [];
 
@@ -417,6 +417,37 @@ export class DatabaseStorage implements IStorage {
       .from(indicators)
       .where(whereClause);
 
+    // Build sort order
+    let orderByClause;
+    if (sortBy && sortOrder) {
+      const direction = sortOrder === 'asc' ? asc : desc;
+      switch (sortBy) {
+        case 'value':
+          orderByClause = direction(indicators.value);
+          break;
+        case 'type':
+          orderByClause = direction(indicators.type);
+          break;
+        case 'source':
+          orderByClause = direction(indicators.source);
+          break;
+        case 'isActive':
+          orderByClause = direction(indicators.isActive);
+          break;
+        case 'tempActiveUntil':
+          orderByClause = direction(indicators.tempActiveUntil);
+          break;
+        case 'createdAt':
+          orderByClause = direction(indicators.createdAt);
+          break;
+        default:
+          orderByClause = desc(indicators.createdAt);
+          break;
+      }
+    } else {
+      orderByClause = desc(indicators.createdAt);
+    }
+
     const data = await db
       .select({
         id: indicators.id,
@@ -440,7 +471,7 @@ export class DatabaseStorage implements IStorage {
       .from(indicators)
       .leftJoin(users, eq(indicators.createdBy, users.id))
       .where(whereClause)
-      .orderBy(desc(indicators.createdAt))
+      .orderBy(orderByClause)
       .limit(limit)
       .offset(offset);
 

@@ -55,6 +55,7 @@ export default function Indicators() {
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -75,13 +76,19 @@ export default function Indicators() {
   }, [debouncedUpdateSearch]);
 
   const { data: indicators, isLoading } = useQuery({
-    queryKey: ["/api/indicators", page, pageSize, filters],
+    queryKey: ["/api/indicators", page, pageSize, filters, sortConfig],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pageSize.toString(),
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v && v !== "all")),
       });
+                  
+      if (sortConfig) {
+        params.set('sortBy', sortConfig.key);
+        params.set('sortOrder', sortConfig.direction);
+      }
+      
       const response = await fetch(`/api/indicators?${params}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -272,6 +279,16 @@ export default function Indicators() {
     setPage(1); // Reset to first page when changing page size
     setSelectedIndicators([]);
     setSelectAll(false);
+  };
+
+  // Handle sorting
+  const handleSort = (key: string, direction: 'asc' | 'desc' | null) => {
+    if (direction === null) {
+      setSortConfig(null);
+    } else {
+      setSortConfig({ key, direction });
+    }
+    setPage(1); // Reset to first page when sorting
   };
 
   const handleViewDetails = (indicator: Indicator) => {
@@ -512,6 +529,9 @@ export default function Indicators() {
               <SortableTable
                 data={indicators?.data || []}
                 isLoading={isLoading}
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                serverSide={true}
                 columns={[
                   {
                     key: "select",

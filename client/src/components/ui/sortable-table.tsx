@@ -20,6 +20,9 @@ export interface SortableTableProps {
   className?: string;
   onRowClick?: (item: any) => void;
   renderRowActions?: (item: any) => React.ReactNode;
+  sortConfig?: SortConfig | null;
+  onSort?: (key: string, direction: 'asc' | 'desc' | null) => void;
+  serverSide?: boolean;
 }
 
 export interface SortConfig {
@@ -35,11 +38,15 @@ export function SortableTable({
   className,
   onRowClick,
   renderRowActions,
+  sortConfig: externalSortConfig,
+  onSort,
+  serverSide = false,
 }: SortableTableProps) {
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null);
+  const [internalSortConfig, setInternalSortConfig] = useState<SortConfig | null>(null);
+  const sortConfig = serverSide ? externalSortConfig : internalSortConfig;
 
   const sortedData = useMemo(() => {
-    if (!sortConfig) return data;
+    if (serverSide || !sortConfig) return data;
 
     return [...data].sort((a, b) => {
       const aValue = getNestedValue(a, sortConfig.key);
@@ -77,23 +84,36 @@ export function SortableTable({
       const result = String(aValue).toLowerCase().localeCompare(String(bValue).toLowerCase());
       return sortConfig.direction === 'asc' ? result : -result;
     });
-  }, [data, sortConfig]);
+  }, [data, sortConfig, serverSide]);
 
   const handleSort = (key: string) => {
     const column = columns.find(col => col.key === key);
     if (!column?.sortable) return;
 
-    setSortConfig(current => {
+     if (serverSide && onSort) {
+      const current = sortConfig;
       if (current?.key === key) {
         if (current.direction === 'asc') {
-          return { key, direction: 'desc' };
+          onSort(key, 'desc');
         } else {
-          return null; // Remove sorting
+          onSort(key, null);
         }
       } else {
-        return { key, direction: 'asc' };
+        onSort(key, 'asc');
       }
-    });
+    } else {
+      setInternalSortConfig(current => {
+        if (current?.key === key) {
+          if (current.direction === 'asc') {
+            return { key, direction: 'desc' };
+          } else {
+            return null; // Remove sorting
+          }
+        } else {
+          return { key, direction: 'asc' };
+        }
+      });
+    }
   };
 
   const getSortIcon = (key: string) => {

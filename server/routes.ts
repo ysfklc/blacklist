@@ -944,7 +944,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Indicators routes
   app.get("/api/indicators", authenticateTokenOrApiKey, async (req, res) => {
     try {
-      const { page = 1, limit = 50, type, status, source, search } = req.query;
+      const { page = 1, limit = 50, type, status, source, search, sortBy, sortOrder } = req.query;
       const filters = {
         type: type as string,
         status: status as string,
@@ -954,7 +954,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const indicators = await storage.getIndicators(
         parseInt(page as string),
         parseInt(limit as string),
-        filters
+        filters,
+        sortBy as string,
+        sortOrder as 'asc' | 'desc'
       );
       
 
