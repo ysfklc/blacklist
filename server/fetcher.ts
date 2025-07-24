@@ -64,23 +64,39 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
           
           // Choose the appropriate agent based on the target URL protocol
           if (source.url.startsWith('https:')) {
-            agent = new HttpsProxyAgent(fullProxyUrl);
+            const httpsProxyAgentOptions: any = {
+              proxy: fullProxyUrl
+            };
+            
             // If ignoring certificate errors, configure the proxy agent
             if (source.ignoreCertificateErrors) {
-              agent.options.rejectUnauthorized = false;
+              httpsProxyAgentOptions.rejectUnauthorized = false;
+              httpsProxyAgentOptions.requestCert = false;
+              httpsProxyAgentOptions.checkServerIdentity = () => undefined;
             }
+            
+            agent = new HttpsProxyAgent(httpsProxyAgentOptions);
           } else {
             agent = new HttpProxyAgent(fullProxyUrl);
           }
           
           console.log(`[FETCH] Using proxy: ${proxyUrl}`);
-        } else if (source.ignoreCertificateErrors && source.url.startsWith('https:')) {
-          // Create custom HTTPS agent that ignores certificate errors
-          agent = new https.Agent({
-            rejectUnauthorized: false
-          });
-          console.log(`[FETCH] Ignoring SSL certificate errors for ${source.name}`);
-        } else if (!source.url.startsWith('https:')) {
+          if (source.ignoreCertificateErrors) {
+            console.log(`[FETCH] Proxy configured to ignore SSL certificate errors for ${source.name}`);
+          }
+        } else if (source.url.startsWith('https:')) {
+          // Create custom HTTPS agent for HTTPS URLs
+          const httpsAgentOptions: any = {};
+          
+          if (source.ignoreCertificateErrors) {
+            httpsAgentOptions.rejectUnauthorized = false;
+            httpsAgentOptions.requestCert = false;
+            httpsAgentOptions.checkServerIdentity = () => undefined;
+            console.log(`[FETCH] Ignoring SSL certificate errors for ${source.name}`);
+          }
+          
+          agent = new https.Agent(httpsAgentOptions);
+        } else {
           // For HTTP, use a simple HTTP agent
           agent = new http.Agent();
         }
