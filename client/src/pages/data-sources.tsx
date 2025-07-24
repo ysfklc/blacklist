@@ -240,9 +240,24 @@ export default function DataSources() {
           </div>
           {isAdmin && (
             <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-              <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                            <Dialog open={isAddModalOpen} onOpenChange={(open) => {
+                setIsAddModalOpen(open);
+                if (!open) {
+                  setEditingSource(null);
+                  form.reset();
+                }
+              }}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button onClick={() => {
+                    setEditingSource(null);
+                    form.reset({
+                      name: "",
+                      url: "",
+                      indicatorTypes: [],
+                      fetchInterval: 3600,
+                      ignoreCertificateErrors: false,
+                    });
+                  }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Source
                   </Button>
@@ -574,7 +589,12 @@ export default function DataSources() {
         </Card>
 
         {/* Edit Modal */}
-        <Dialog open={!!editingSource} onOpenChange={(open) => !open && setEditingSource(null)}>
+        <Dialog open={!!editingSource} onOpenChange={(open) => {
+          if (!open) {
+            setEditingSource(null);
+            form.reset();
+          }
+        }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Edit Data Source</DialogTitle>
