@@ -26,6 +26,7 @@ export const dataSources = pgTable("data_sources", {
   indicatorTypes: text("indicator_types").array().notNull(), // array of: ip, domain, hash, url, soar-url
   fetchInterval: integer("fetch_interval").notNull().default(3600), // seconds
   isActive: boolean("is_active").notNull().default(true),
+  ignoreCertificateErrors: boolean("ignore_certificate_errors").notNull().default(false),
   isPaused: boolean("is_paused").notNull().default(false),
   lastFetch: timestamp("last_fetch"),
   lastFetchStatus: text("last_fetch_status"), // success, error
