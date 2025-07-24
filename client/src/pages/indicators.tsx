@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { SortableTable, SortableColumn } from "@/components/ui/sortable-table";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Trash2, Eye, MessageSquare, Clock, Copy } from "lucide-react";
@@ -47,9 +48,9 @@ export default function Indicators() {
   const [tempActivateIndicatorId, setTempActivateIndicatorId] = useState<number | null>(null);
   const [isTempActivateDialogOpen, setIsTempActivateDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
-    type: "all",
+    type: [] as string[],
     status: "all",
-    source: "all",
+    source: [] as string[],
     search: "",
   });
   const [searchInput, setSearchInput] = useState("");
@@ -81,8 +82,27 @@ export default function Indicators() {
       const params = new URLSearchParams({
         page: page.toString(),
         limit: pageSize.toString(),
-        ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v && v !== "all")),
-      });
+        });
+      
+      // Add search filter
+      if (filters.search) {
+        params.set('search', filters.search);
+      }
+      
+      // Add status filter
+      if (filters.status && filters.status !== "all") {
+        params.set('status', filters.status);
+      }
+      
+      // Add type filters (multiple)
+      if (filters.type.length > 0) {
+        filters.type.forEach(type => params.append('type', type));
+      }
+      
+      // Add source filters (multiple)
+      if (filters.source.length > 0) {
+        filters.source.forEach(source => params.append('source', source));
+      }
                   
       if (sortConfig) {
         params.set('sortBy', sortConfig.key);
@@ -414,21 +434,22 @@ export default function Indicators() {
           <CardContent className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <Select value={filters.type} onValueChange={(value) => setFilters({ ...filters, type: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="ip">IP Address</SelectItem>
-                    <SelectItem value="domain">Domain</SelectItem>
-                    <SelectItem value="hash">Hash</SelectItem>
-                    <SelectItem value="url">URL</SelectItem>
-                    {isSoarUrlEnabled && (
-                      <SelectItem value="soar-url">SOAR-URL</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <MultiSelect
+                  options={[
+                    { value: "ip", label: "IP Address" },
+                    { value: "domain", label: "Domain" },
+                    { value: "hash", label: "Hash" },
+                    { value: "url", label: "URL" },
+                    ...(isSoarUrlEnabled ? [{ value: "soar-url", label: "SOAR-URL" }] : [])
+                  ]}
+                  value={filters.type}
+                  onChange={(value) => {
+                    setFilters({ ...filters, type: value });
+                    setPage(1);
+                  }}
+                  placeholder="All Types"
+                  className="w-full"
+                />
               </div>
               <div>
                 <Select value={filters.status} onValueChange={(value) => setFilters({ ...filters, status: value })}>
@@ -443,19 +464,19 @@ export default function Indicators() {
                 </Select>
               </div>
               <div>
-                <Select value={filters.source} onValueChange={(value) => setFilters({ ...filters, source: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Sources" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Sources</SelectItem>
-                    {indicatorSources?.map((source: any) => (
-                      <SelectItem key={source.value} value={source.value}>
-                        {source.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <MultiSelect
+                  options={indicatorSources?.map((source: any) => ({
+                    value: source.value,
+                    label: source.label
+                  })) || []}
+                  value={filters.source}
+                  onChange={(value) => {
+                    setFilters({ ...filters, source: value });
+                    setPage(1);
+                  }}
+                  placeholder="All Sources"
+                  className="w-full"
+                />
               </div>
               <div>
                 <Input

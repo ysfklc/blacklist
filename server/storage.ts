@@ -395,17 +395,30 @@ export class DatabaseStorage implements IStorage {
     const offset = (page - 1) * limit;
     const conditions = [];
 
-    if (filters.type) {
-      conditions.push(eq(indicators.type, filters.type));
+    // Handle multiple types
+    if (filters.type && filters.type.length > 0) {
+      if (filters.type.length === 1) {
+        conditions.push(eq(indicators.type, filters.type[0]));
+      } else {
+        conditions.push(inArray(indicators.type, filters.type));
+      }
     }
+    
     if (filters.status === 'active') {
       conditions.push(eq(indicators.isActive, true));
     } else if (filters.status === 'passive') {
       conditions.push(eq(indicators.isActive, false));
     }
-    if (filters.source) {
-      conditions.push(eq(indicators.source, filters.source));
+        
+    // Handle multiple sources
+    if (filters.source && filters.source.length > 0) {
+      if (filters.source.length === 1) {
+        conditions.push(eq(indicators.source, filters.source[0]));
+      } else {
+        conditions.push(inArray(indicators.source, filters.source));
+      }
     }
+    
     if (filters.search) {
       conditions.push(ilike(indicators.value, `%${filters.search}%`));
     }

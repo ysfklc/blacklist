@@ -945,10 +945,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/indicators", authenticateTokenOrApiKey, async (req, res) => {
     try {
       const { page = 1, limit = 50, type, status, source, search, sortBy, sortOrder } = req.query;
+            
+      // Handle multiple values for type and source
+      const typeArray = Array.isArray(type) ? type : (type ? [type] : []);
+      const sourceArray = Array.isArray(source) ? source : (source ? [source] : []);
+      
       const filters = {
-        type: type as string,
+        type: typeArray as string[],
         status: status as string,
-        source: source as string,
+        source: sourceArray as string[],
         search: search as string,
       };
       const indicators = await storage.getIndicators(
