@@ -617,7 +617,12 @@ export default function Indicators() {
                     sortable: true,
                     render: (createdAt: string) => (
                       <span className="text-sm text-muted-foreground">
-                        {new Date(createdAt).toLocaleDateString()}
+                        <div className="flex flex-col">
+                          <span>{new Date(createdAt).toLocaleDateString()}</span>
+                          <span className="text-xs opacity-70">
+                            {new Date(createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
                       </span>
                     )
                   },
