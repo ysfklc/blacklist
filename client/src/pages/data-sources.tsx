@@ -23,6 +23,7 @@ const dataSourceSchema = z.object({
   url: z.string().url("Invalid URL"),
   indicatorTypes: z.array(z.enum(["ip", "domain", "hash", "url", "soar-url"])).min(1, "At least one indicator type is required"),
   fetchInterval: z.number().min(60, "Minimum interval is 60 seconds"),
+  ignoreCertificateErrors: z.boolean().optional().default(false),
 });
 
 type DataSourceFormData = z.infer<typeof dataSourceSchema>;
@@ -35,6 +36,7 @@ interface DataSource {
   fetchInterval: number;
   isActive: boolean;
   isPaused: boolean;
+  ignoreCertificateErrors: boolean;
   lastFetch: string | null;
   lastFetchStatus: string | null;
   createdAt: string;
@@ -71,6 +73,7 @@ export default function DataSources() {
       url: "",
       indicatorTypes: [],
       fetchInterval: 3600,
+      ignoreCertificateErrors: false,
     },
   });
 
@@ -202,6 +205,7 @@ export default function DataSources() {
       url: source.url,
       indicatorTypes: source.indicatorTypes as ("ip" | "domain" | "hash" | "url")[],
       fetchInterval: source.fetchInterval,
+      ignoreCertificateErrors: source.ignoreCertificateErrors || false,
     });
   };
 
@@ -333,6 +337,26 @@ export default function DataSources() {
                               />
                             </FormControl>
                             <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="ignoreCertificateErrors"
+                        render={({ field }) => (
+                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                              <FormLabel>Ignore Certificate Errors</FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                Ignore SSL/TLS certificate errors when accessing this data source
+                              </p>
+                            </div>
                           </FormItem>
                         )}
                       />
@@ -640,6 +664,26 @@ export default function DataSources() {
                         />
                       </FormControl>
                       <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                                <FormField
+                  control={form.control}
+                  name="ignoreCertificateErrors"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel>Ignore Certificate Errors</FormLabel>
+                        <p className="text-sm text-muted-foreground">
+                          Ignore SSL/TLS certificate errors when accessing this data source
+                        </p>
+                      </div>
                     </FormItem>
                   )}
                 />

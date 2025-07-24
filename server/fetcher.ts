@@ -63,14 +63,28 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
           // Choose the appropriate agent based on the target URL protocol
           if (source.url.startsWith('https:')) {
             agent = new HttpsProxyAgent(fullProxyUrl);
+            // If ignoring certificate errors, configure the proxy agent
+            if (source.ignoreCertificateErrors) {
+              agent.options.rejectUnauthorized = false;
+            }
           } else {
             agent = new HttpProxyAgent(fullProxyUrl);
           }
           
           console.log(`[FETCH] Using proxy: ${proxyUrl}`);
+        } else if (source.ignoreCertificateErrors && source.url.startsWith('https:')) {
+          // Create custom HTTPS agent that ignores certificate errors
+          agent = new https.Agent({
+            rejectUnauthorized: false
+          });
+          console.log(`[FETCH] Ignoring SSL certificate errors for ${source.name}`);
+        } else if (!source.url.startsWith('https:')) {
+          // For HTTP, use a simple HTTP agent
+          agent = new http.Agent();
         }
         
-        const response = await fetch(source.url, {
+        // Configure fetch options
+        const fetchOptions: any = {
           headers: {
             'User-Agent': 'TheBlackList-Platform/1.0',
             'Accept': 'text/plain, */*',
@@ -80,7 +94,9 @@ async function fetchWithRetry(source: DataSource, maxRetries: number = 3): Promi
           signal: controller.signal,
           keepalive: false,
           agent,
-        });
+        };
+        
+        const response = await fetch(source.url, fetchOptions);
 
         clearTimeout(timeoutId);
 
