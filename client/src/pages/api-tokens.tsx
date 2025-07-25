@@ -28,10 +28,15 @@ export default function ApiTokensPage() {
   const [newTokenExpiry, setNewTokenExpiry] = useState("");
   const [createdToken, setCreatedToken] = useState<string | null>(null);
   const [showTokenDialog, setShowTokenDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [password, setPassword] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [viewingTokenId, setViewingTokenId] = useState<number | null>(null);
+  const [revealedToken, setRevealedToken] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: tokens = [], isLoading } = useQuery({
+  const { data: tokens = [], isLoading } = useQuery<ApiToken[]>({
     queryKey: ["/api/tokens"],
   });
 
@@ -104,6 +109,37 @@ export default function ApiTokensPage() {
     },
   });
 
+  const verifyPasswordMutation = useMutation({
+    mutationFn: async (password: string) => {
+      if (viewingTokenId) {
+        // Use the new token reveal endpoint that combines password verification and token retrieval
+        const response = await apiRequest("POST", `/api/tokens/${viewingTokenId}/reveal`, { password });
+        return await response.json();
+      } else {
+        // Fallback to just password verification
+        const response = await apiRequest("POST", "/api/auth/verify-password", { password });
+        return await response.json();
+      }
+    },
+    onSuccess: (data) => {
+      setShowPasswordDialog(false);
+      setPassword("");
+      
+      if (viewingTokenId && data.token) {
+        // Set the full revealed token
+        setRevealedToken(data.token);
+        // Keep viewingTokenId set so isTokenRevealed works correctly
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Invalid Password",
+        description: "The password you entered is incorrect.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCreateToken = () => {
     if (!newTokenName.trim()) {
       toast({
@@ -123,6 +159,34 @@ export default function ApiTokensPage() {
     }
 
     createMutation.mutate(data);
+  };
+
+  const handleVerifyPassword = () => {
+    if (!password.trim()) {
+      toast({
+        title: "Error",
+        description: "Password is required.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    verifyPasswordMutation.mutate(password.trim());
+  };
+
+  const handleClosePasswordDialog = () => {
+    setShowPasswordDialog(false);
+    setPassword("");
+    setViewingTokenId(null);
+  };
+
+  const handleViewToken = (tokenId: number) => {
+    setViewingTokenId(tokenId);
+    setShowPasswordDialog(true);
+  };
+
+  const isTokenRevealed = (tokenId: number) => {
+    return revealedToken && viewingTokenId === tokenId;
   };
 
   const copyToClipboard = (text: string) => {
@@ -263,17 +327,43 @@ export default function ApiTokensPage() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Token:</span>
+                      <div className="flex space-x-2">
+                        {isTokenRevealed(token.id) ? (
+                          <>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => copyToClipboard(token.token)}
+                        onClick={() => copyToClipboard(revealedToken || "")}
                       >
                         <Copy className="w-4 h-4 mr-2" />
                         Copy
                       </Button>
+                                                  <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setRevealedToken(null);
+                                setViewingTokenId(null);
+                              }}
+                            >
+                              <EyeOff className="w-4 h-4 mr-2" />
+                              Hide
+                            </Button>
+                          </>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewToken(token.id)}
+                          >
+                            <Eye className="w-4 h-4 mr-2" />
+                            View
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     <code className="text-xs font-mono bg-muted px-2 py-1 rounded block break-all">
-                      {token.token.substring(0, 40)}...
+                      {isTokenRevealed(token.id) ? revealedToken : "••••••••••••••••••••••••••••••••••••••••"}
                     </code>
                   </div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
@@ -313,6 +403,57 @@ export default function ApiTokensPage() {
           ))
         )}
       </div>
+
+      {/* Password Verification Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={handleClosePasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verify Your Password</DialogTitle>
+            <DialogDescription>
+              Please enter your password to view the generated API token.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center space-x-2 mt-2">
+                <Input
+                  id="password"
+                  type={isPasswordVisible ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleVerifyPassword();
+                    }
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => setIsPasswordVisible(!isPasswordVisible)}
+                >
+                  {isPasswordVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button
+                variant="outline"
+                onClick={handleClosePasswordDialog}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleVerifyPassword}
+                disabled={verifyPasswordMutation.isPending}
+              >
+                {verifyPasswordMutation.isPending ? "Verifying..." : "Verify"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Token Created Dialog */}
       <Dialog open={showTokenDialog} onOpenChange={setShowTokenDialog}>

@@ -454,6 +454,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Password verification route for API token access
+  app.post("/api/auth/verify-password", authenticateToken, async (req, res) => {
+    try {
+      const { password } = req.body;
+      
+      console.log('[PASSWORD_VERIFY] Request received', { userId: req.user?.userId, passwordProvided: !!password });
+      
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+
+      // Get user
+      const user = await storage.getUser(req.user.userId);
+      console.log('[PASSWORD_VERIFY] User found', { userId: user?.id, authType: user?.authType });
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // For LDAP users, we cannot verify their password as we don't store it
+      if (user.authType === 'ldap') {
+        return res.status(400).json({ error: "Password verification not available for LDAP users" });
+      }
+
+      // Check if user has a password (for local auth users)
+      if (!user.password) {
+        console.log('[PASSWORD_VERIFY] User has no password stored');
+        return res.status(400).json({ error: "No password set for this user" });
+      }
+
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      console.log('[PASSWORD_VERIFY] Password verification result', { isValid: isPasswordValid });
+      
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      res.json({ message: "Password verified successfully" });
+    } catch (error) {
+      console.error('[PASSWORD_VERIFY] Error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Get full token with password verification
+  app.post("/api/tokens/:id/reveal", authenticateToken, async (req, res) => {
+    try {
+      const { password } = req.body;
+      const tokenId = parseInt(req.params.id);
+      
+      console.log('[TOKEN_REVEAL] Request received', { userId: req.user?.userId, tokenId, passwordProvided: !!password });
+      
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+
+      // Get user
+      const user = await storage.getUser(req.user.userId);
+      console.log('[TOKEN_REVEAL] User found', { userId: user?.id, authType: user?.authType });
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // For LDAP users, we cannot verify their password as we don't store it
+      if (user.authType === 'ldap') {
+        return res.status(400).json({ error: "Password verification not available for LDAP users" });
+      }
+
+      // Check if user has a password (for local auth users)
+      if (!user.password) {
+        console.log('[TOKEN_REVEAL] User has no password stored');
+        return res.status(400).json({ error: "No password set for this user" });
+      }
+
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      console.log('[TOKEN_REVEAL] Password verification result', { isValid: isPasswordValid });
+      
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "Invalid password" });
+      }
+
+      // Get the token
+      const tokens = await storage.getApiTokens(req.user.userId);
+      const token = tokens.find(t => t.id === tokenId);
+      
+      if (!token) {
+        return res.status(404).json({ error: "Token not found" });
+      }
+
+      res.json({ token: token.token });
+    } catch (error) {
+      console.error('[TOKEN_REVEAL] Error:', error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // User management routes
   app.get("/api/users", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
