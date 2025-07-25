@@ -117,6 +117,7 @@ export const whitelistBlocks = pgTable("whitelist_blocks", {
   whitelistEntryId: integer("whitelist_entry_id").references(() => whitelist.id),
   attemptedAt: timestamp("attempted_at").defaultNow().notNull(),
   blockedReason: text("blocked_reason"),
+  createdBy: integer("created_by").references(() => users.id),
 });
 
 export const apiTokens = pgTable("api_tokens", {

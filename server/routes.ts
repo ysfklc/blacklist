@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { authenticateToken, requireRole, hashPassword, authenticateTokenOrApiKey, type AuthRequest } from "./auth";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { insertUserSchema, insertDataSourceSchema, insertIndicatorSchema, insertWhitelistSchema, insertIndicatorNoteSchema } from "@shared/schema";
+import { insertUserSchema, insertDataSourceSchema, insertIndicatorSchema, insertWhitelistSchema, insertIndicatorNoteSchema, insertWhitelistBlockSchema } from "@shared/schema";
 import { z } from "zod";
 import fs from "fs/promises";
 import path from "path";
@@ -1106,6 +1106,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if indicator is whitelisted
       const isWhitelisted = await storage.isWhitelisted(validatedData.value, validatedData.type);
       if (isWhitelisted) {
+        // Record this whitelist block for tracking
+        try {
+          await storage.recordWhitelistBlock(validatedData.value, validatedData.type, "manual", undefined, req.user.userId);
+        } catch (blockError) {
+          console.error('Failed to record whitelist block:', blockError);
+        }
+                
         await storage.createAuditLog({
           level: "warning",
           action: "blocked",
@@ -1353,7 +1360,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Whitelist routes
   app.get("/api/whitelist", authenticateTokenOrApiKey, async (req, res) => {
     try {
-      const whitelist = await storage.getWhitelist();
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 25;
+      
+      // Validate pagination parameters
+      if (page < 1 || limit < 1 || limit > 500) {
+        return res.status(400).json({ 
+          error: "Invalid pagination parameters", 
+          details: "Page must be >= 1 and limit must be between 1 and 500" 
+        });
+      }
+      
+      const whitelist = await storage.getWhitelist(page, limit);
       res.json(whitelist);
     } catch (error) {
       res.status(500).json({ error: "Internal server error" });

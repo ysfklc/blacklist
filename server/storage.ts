@@ -887,8 +887,14 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
-  async getWhitelist(): Promise<any[]> {
-    return await db
+  async getWhitelist(page: number = 1, limit: number = 25): Promise<any> {
+    const offset = (page - 1) * limit;
+
+    const [totalCount] = await db
+      .select({ count: count() })
+      .from(whitelist);
+
+    const data = await db
       .select({
         id: whitelist.id,
         value: whitelist.value,
@@ -901,7 +907,21 @@ export class DatabaseStorage implements IStorage {
       })
       .from(whitelist)
       .leftJoin(users, eq(whitelist.createdBy, users.id))
-      .orderBy(desc(whitelist.createdAt));
+      .orderBy(desc(whitelist.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: totalCount.count,
+        start: offset + 1,
+        end: Math.min(offset + limit, totalCount.count),
+        hasNext: offset + limit < totalCount.count,
+      },
+    };
   }
 
   async getWhitelistEntryById(id: number): Promise<WhitelistEntry | undefined> {
@@ -1315,10 +1335,12 @@ export class DatabaseStorage implements IStorage {
         blockedReason: whitelistBlocks.blockedReason,
         sourceName: dataSources.name,
         whitelistValue: whitelist.value,
+        createdByUsername: users.username,
       })
       .from(whitelistBlocks)
       .leftJoin(dataSources, eq(whitelistBlocks.sourceId, dataSources.id))
       .leftJoin(whitelist, eq(whitelistBlocks.whitelistEntryId, whitelist.id))
+      .leftJoin(users, eq(whitelistBlocks.createdBy, users.id))
       .orderBy(desc(whitelistBlocks.attemptedAt))
       .limit(limit)
       .offset(offset);
@@ -1344,12 +1366,12 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async recordWhitelistBlock(value: string, type: string, source: string, sourceId?: number): Promise<void> {
+  async recordWhitelistBlock(value: string, type: string, source: string, sourceId?: number, createdBy?: number): Promise<void> {
     // Find the whitelist entry that blocked this indicator
     let whitelistEntryId: number | undefined;
     let whitelistEntryValue: string | undefined;
     
-    if (type === 'ip' && await this.isWhitelisted(value, type)) {
+    if (type === 'ip') {
       // For IP addresses, find the matching whitelist entry (including CIDR ranges)
       const whitelistEntries = await db
         .select({ id: whitelist.id, value: whitelist.value })
@@ -1396,6 +1418,7 @@ export class DatabaseStorage implements IStorage {
       sourceId,
       whitelistEntryId,
       blockedReason: `Blocked by whitelist entry during feed processing`,
+      createdBy,      
     });
 
     // Create audit log for whitelist block
