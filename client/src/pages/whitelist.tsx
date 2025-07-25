@@ -58,13 +58,15 @@ export default function Whitelist() {
   const [selectAll, setSelectAll] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
+  const [blocksPage, setBlocksPage] = useState(1);
+  const [blocksPageSize, setBlocksPageSize] = useState(25);
 
   const { data: whitelistResponse, isLoading } = useQuery({
     queryKey: ["/api/whitelist", page, pageSize],
   });
 
   const { data: whitelistBlocks, isLoading: blocksLoading } = useQuery({
-    queryKey: ["/api/whitelist/blocks"],
+    queryKey: ["/api/whitelist/blocks", blocksPage, blocksPageSize],
   });
 
   const form = useForm<WhitelistFormData>({
@@ -121,6 +123,11 @@ export default function Whitelist() {
   const handlePageSizeChange = (value: string) => {
     setPageSize(parseInt(value));
     setPage(1); // Reset to first page when changing page size
+  };
+
+  const handleBlocksPageSizeChange = (value: string) => {
+    setBlocksPageSize(parseInt(value));
+    setBlocksPage(1); // Reset to first page when changing page size
   };
 
   const totalPages = pagination ? Math.ceil(pagination.total / pageSize) : 1;
@@ -670,6 +677,185 @@ export default function Whitelist() {
                   ))}
                 </TableBody>
               </Table>
+            )}
+            {/* Blocks Pagination */}
+            {whitelistBlocks?.pagination && (
+              <div className="p-6 border-t flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="text-sm text-gray-700">
+                    Showing {whitelistBlocks.pagination.start} to {whitelistBlocks.pagination.end} of{" "}
+                    {whitelistBlocks.pagination.total} results
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Label htmlFor="blocks-page-size" className="text-sm text-gray-600">Items per page:</Label>
+                    <Select value={blocksPageSize.toString()} onValueChange={handleBlocksPageSizeChange}>
+                      <SelectTrigger id="blocks-page-size" className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="25">25</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                        <SelectItem value="100">100</SelectItem>
+                        <SelectItem value="250">250</SelectItem>
+                        <SelectItem value="500">500</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBlocksPage(1)}
+                    disabled={blocksPage === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBlocksPage(blocksPage - 1)}
+                    disabled={blocksPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <div className="flex items-center space-x-1">
+                    {(() => {
+                      const pages = [];
+                      const totalBlocksPages = Math.ceil(whitelistBlocks.pagination.total / blocksPageSize);
+                      const maxVisiblePages = 5;
+                      
+                      if (totalBlocksPages <= maxVisiblePages) {
+                        for (let i = 1; i <= totalBlocksPages; i++) {
+                          pages.push(
+                            <Button
+                              key={i}
+                              variant={blocksPage === i ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setBlocksPage(i)}
+                              className="w-10"
+                            >
+                              {i}
+                            </Button>
+                          );
+                        }
+                      } else {
+                        if (blocksPage <= 3) {
+                          for (let i = 1; i <= 4; i++) {
+                            pages.push(
+                              <Button
+                                key={i}
+                                variant={blocksPage === i ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setBlocksPage(i)}
+                                className="w-10"
+                              >
+                                {i}
+                              </Button>
+                            );
+                          }
+                          pages.push(<span key="ellipsis1" className="px-2 text-gray-500">...</span>);
+                          pages.push(
+                            <Button
+                              key={totalBlocksPages}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBlocksPage(totalBlocksPages)}
+                              className="w-10"
+                            >
+                              {totalBlocksPages}
+                            </Button>
+                          );
+                        } else if (blocksPage > totalBlocksPages - 3) {
+                          pages.push(
+                            <Button
+                              key={1}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBlocksPage(1)}
+                              className="w-10"
+                            >
+                              1
+                            </Button>
+                          );
+                          pages.push(<span key="ellipsis2" className="px-2 text-gray-500">...</span>);
+                          for (let i = totalBlocksPages - 3; i <= totalBlocksPages; i++) {
+                            pages.push(
+                              <Button
+                                key={i}
+                                variant={blocksPage === i ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setBlocksPage(i)}
+                                className="w-10"
+                              >
+                                {i}
+                              </Button>
+                            );
+                          }
+                        } else {
+                          pages.push(
+                            <Button
+                              key={1}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBlocksPage(1)}
+                              className="w-10"
+                            >
+                              1
+                            </Button>
+                          );
+                          pages.push(<span key="ellipsis3" className="px-2 text-gray-500">...</span>);
+                          for (let i = blocksPage - 1; i <= blocksPage + 1; i++) {
+                            pages.push(
+                              <Button
+                                key={i}
+                                variant={blocksPage === i ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setBlocksPage(i)}
+                                className="w-10"
+                              >
+                                {i}
+                              </Button>
+                            );
+                          }
+                          pages.push(<span key="ellipsis4" className="px-2 text-gray-500">...</span>);
+                          pages.push(
+                            <Button
+                              key={totalBlocksPages}
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setBlocksPage(totalBlocksPages)}
+                              className="w-10"
+                            >
+                              {totalBlocksPages}
+                            </Button>
+                          );
+                        }
+                      }
+                      
+                      return pages;
+                    })()}
+                  </div>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBlocksPage(blocksPage + 1)}
+                    disabled={!whitelistBlocks.pagination.hasNext}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setBlocksPage(Math.ceil(whitelistBlocks.pagination.total / blocksPageSize))}
+                    disabled={!whitelistBlocks.pagination.hasNext}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>
