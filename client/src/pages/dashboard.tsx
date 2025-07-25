@@ -322,6 +322,7 @@ export default function Dashboard() {
                                     <div className="text-left sm:text-right text-sm text-gray-500 flex-shrink-0">
                                       <time>{new Date(activity.createdAt).toLocaleTimeString()}</time>
                                     </div>
+                                  </div>
                                 </div>
                               </div>
                             </div>
