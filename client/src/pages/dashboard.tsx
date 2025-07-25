@@ -286,7 +286,7 @@ export default function Dashboard() {
                   <p className="text-gray-500 text-sm">No recent activity</p>
                 ) : (
                   <div className="flow-root max-h-96 overflow-y-auto">
-                    <ul role="list" className="-mb-8">
+                    <ul role="list" className="space-y-4">
                       {(() => {
                         const filteredActivities = stats.recentActivity.filter((activity) => {
                           // For users, only show fetch and blocked activities
@@ -301,9 +301,9 @@ export default function Dashboard() {
                         
                         return filteredActivities.map((activity, index) => (
                           <li key={activity.id}>
-                            <div className={`relative ${index !== filteredActivities.length - 1 ? 'pb-8' : ''}`}>
+                            <div className="relative pb-4">
                               {index !== filteredActivities.length - 1 && (
-                                <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200"></span>
+                                <span className="absolute top-4 left-4 -ml-px h-6 w-0.5 bg-gray-200"></span>
                               )}
                               <div className="relative flex space-x-3">
                                 <div>
@@ -314,13 +314,14 @@ export default function Dashboard() {
                                     <span className="h-2 w-2 bg-white rounded-full"></span>
                                   </span>
                                 </div>
-                                <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm text-gray-500 break-words">{activity.details}</p>
-                                  </div>
-                                  <div className="text-right text-sm whitespace-nowrap text-gray-500 flex-shrink-0">
-                                    <time>{new Date(activity.createdAt).toLocaleTimeString()}</time>
-                                  </div>
+                                <div className="min-w-0 flex-1 pt-1.5">
+                                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
+                                    <div className="min-w-0 flex-1 pr-2">
+                                      <p className="text-sm text-gray-500 break-words leading-relaxed">{activity.details}</p>
+                                    </div>
+                                    <div className="text-left sm:text-right text-sm text-gray-500 flex-shrink-0">
+                                      <time>{new Date(activity.createdAt).toLocaleTimeString()}</time>
+                                    </div>
                                 </div>
                               </div>
                             </div>
