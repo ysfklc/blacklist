@@ -47,6 +47,7 @@ interface WhitelistBlock {
   attemptedAt: string;
   blockedReason: string | null;
   whitelistValue: string | null;
+  createdByUsername: string | null;
 }
 
 export default function Whitelist() {
@@ -656,7 +657,7 @@ export default function Whitelist() {
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">
-                          {block.sourceName || block.source}
+                          {block.sourceName || (block.source === 'manual' ? (block.createdByUsername || 'Manual Entry') : block.source)}
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
