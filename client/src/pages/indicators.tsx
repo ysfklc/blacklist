@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -11,7 +12,7 @@ import { SortableTable, SortableColumn } from "@/components/ui/sortable-table";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Eye, MessageSquare, Clock, Copy } from "lucide-react";
+import { Plus, Trash2, Eye, MessageSquare, Clock, Copy, Upload } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -25,7 +26,12 @@ const indicatorSchema = z.object({
   value: z.string().min(1, "Value is required"),
 });
 
+const bulkIndicatorSchema = z.object({
+  values: z.string().min(1, "At least one indicator value is required"),
+});
+
 type IndicatorFormData = z.infer<typeof indicatorSchema>;
+type BulkIndicatorFormData = z.infer<typeof bulkIndicatorSchema>;
 
 interface Indicator {
   id: number;
@@ -41,6 +47,7 @@ interface Indicator {
 
 export default function Indicators() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isBulkAddModalOpen, setIsBulkAddModalOpen] = useState(false);
   const [selectedIndicator, setSelectedIndicator] = useState<Indicator | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [selectedIndicators, setSelectedIndicators] = useState<number[]>([]);
@@ -103,7 +110,7 @@ export default function Indicators() {
       if (filters.source.length > 0) {
         filters.source.forEach(source => params.append('source', source));
       }
-                  
+            
       if (sortConfig) {
         params.set('sortBy', sortConfig.key);
         params.set('sortOrder', sortConfig.direction);
@@ -156,6 +163,13 @@ export default function Indicators() {
     },
   });
 
+  const bulkForm = useForm<BulkIndicatorFormData>({
+    resolver: zodResolver(bulkIndicatorSchema),
+    defaultValues: {
+      values: "",
+    },
+  });
+
   const createMutation = useMutation({
     mutationFn: (data: IndicatorFormData) => 
       apiRequest("POST", "/api/indicators", data),
@@ -172,6 +186,57 @@ export default function Indicators() {
       toast({
         title: "Error",
         description: error.message || "Failed to create indicator",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const bulkCreateMutation = useMutation({
+    mutationFn: async (data: BulkIndicatorFormData) => {
+      const lines = data.values.split('\n').filter(line => line.trim());
+      const results = [];
+      const errors = [];
+
+      for (const line of lines) {
+        try {
+          const result = await apiRequest("POST", "/api/indicators", { value: line.trim() });
+          results.push(result);
+        } catch (error: any) {
+          errors.push({ value: line.trim(), error: error.message });
+        }
+      }
+
+      return { results, errors };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/indicators"] });
+      setIsBulkAddModalOpen(false);
+      bulkForm.reset();
+      
+      const { results, errors } = data;
+      
+      if (errors.length === 0) {
+        toast({
+          title: "Success",
+          description: `${results.length} indicator${results.length > 1 ? 's' : ''} created successfully`,
+        });
+      } else if (results.length === 0) {
+        toast({
+          title: "Error",
+          description: `Failed to create any indicators. ${errors.length} error${errors.length > 1 ? 's' : ''} occurred.`,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Partial Success",
+          description: `${results.length} indicator${results.length > 1 ? 's' : ''} created. ${errors.length} failed.`,
+        });
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create indicators",
         variant: "destructive",
       });
     },
@@ -216,6 +281,10 @@ export default function Indicators() {
 
   const onSubmit = (data: IndicatorFormData) => {
     createMutation.mutate(data);
+  };
+
+  const onBulkSubmit = (data: BulkIndicatorFormData) => {
+    bulkCreateMutation.mutate(data);
   };
 
   const handleToggleStatus = (indicator: Indicator) => {
@@ -299,7 +368,7 @@ export default function Indicators() {
     setPage(1); // Reset to first page when changing page size
     setSelectedIndicators([]);
     setSelectAll(false);
-  };
+ };
 
   // Handle sorting
   const handleSort = (key: string, direction: 'asc' | 'desc' | null) => {
@@ -375,13 +444,14 @@ export default function Indicators() {
           </div>
           {canCreate && (
             <div className="mt-4 sm:mt-0 sm:ml-16 sm:flex-none">
-              <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Indicator
-                  </Button>
-                </DialogTrigger>
+              <div className="flex space-x-2">
+                <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Indicator
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Add Indicator</DialogTitle>
@@ -425,6 +495,64 @@ export default function Indicators() {
                   </Form>
                 </DialogContent>
               </Dialog>
+
+              <Dialog open={isBulkAddModalOpen} onOpenChange={setIsBulkAddModalOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Upload className="h-4 w-4 mr-2" />
+                    Bulk Add
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Bulk Add Indicators</DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Enter multiple indicators on separate lines. Each indicator type will be automatically detected.
+                    </p>
+                  </DialogHeader>
+                  <Form {...bulkForm}>
+                    <form onSubmit={bulkForm.handleSubmit(onBulkSubmit)} className="space-y-4">
+                      <FormField
+                        control={bulkForm.control}
+                        name="values"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Indicators (one per line)</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder={`192.168.1.1\nexample.com\nd41d8cd98f00b204e9800998ecf8427e\nhttps://malicious-site.com`}
+                                className="min-h-[200px] font-mono text-sm"
+                                {...field} 
+                              />
+                            </FormControl>
+                            <div className="text-xs text-muted-foreground">
+                              Supported types: IP addresses, domains, hashes (MD5, SHA1, SHA256, SHA384, SHA512), and URLs
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsBulkAddModalOpen(false);
+                            bulkForm.reset();
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={bulkCreateMutation.isPending}>
+                          {bulkCreateMutation.isPending ? "Creating..." : "Create All"}
+                        </Button>
+                      </div>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+              </div>
             </div>
           )}
         </div>
