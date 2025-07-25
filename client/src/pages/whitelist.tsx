@@ -33,7 +33,7 @@ interface WhitelistEntry {
   type: string;
   reason: string | null;
   createdAt: string;
-  createdBy: {
+  createdBy?: {
     username: string;
   };
 }
@@ -50,6 +50,32 @@ interface WhitelistBlock {
   createdByUsername: string | null;
 }
 
+interface WhitelistResponse {
+  data: WhitelistEntry[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    start: number;
+    end: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+interface WhitelistBlocksResponse {
+  data: WhitelistBlock[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    start: number;
+    end: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
 export default function Whitelist() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -60,14 +86,15 @@ export default function Whitelist() {
   const [pageSize, setPageSize] = useState(25);
   const [blocksPage, setBlocksPage] = useState(1);
   const [blocksPageSize, setBlocksPageSize] = useState(25);
+  const [blocksSortConfig, setBlocksSortConfig] = useState<{ key: string; direction: "asc" | "desc" } | null>(null);
 
-  const { data: whitelistResponse, isLoading } = useQuery({
+  const { data: whitelistResponse, isLoading } = useQuery<WhitelistResponse>({
     queryKey: ["/api/whitelist", page, pageSize],
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
-  const { data: whitelistBlocks, isLoading: blocksLoading } = useQuery({
-    queryKey: ["/api/whitelist/blocks", blocksPage, blocksPageSize],
+  const { data: whitelistBlocks, isLoading: blocksLoading } = useQuery<WhitelistBlocksResponse>({
+    queryKey: ["/api/whitelist/blocks", blocksPage, blocksPageSize, blocksSortConfig],
     refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
@@ -636,52 +663,78 @@ export default function Whitelist() {
                 <p>No blocked attempts yet. When indicators from data sources match whitelist entries, they will appear here.</p>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Blocked Value</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Source</TableHead>
-                    <TableHead>Blocked By</TableHead>
-                    <TableHead>Attempted</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {whitelistBlocks.data.map((block: WhitelistBlock) => (
-                    <TableRow key={block.id} className="group">
-                      <TableCell className="font-mono text-sm">
-                        <div className="flex items-center space-x-2">
-                          <span>{block.value}</span>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopy(block.value)}
-                            className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getTypeColor(block.type)}>
-                          {block.type.toUpperCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {block.sourceName || (block.source === 'manual' ? (block.createdByUsername || 'Manual Entry') : block.source)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {block.whitelistValue || 'Unknown'}
-                      </TableCell>
-                      <TableCell className="text-sm text-gray-500">
-                        {new Date(block.attemptedAt).toLocaleDateString()} {new Date(block.attemptedAt).toLocaleTimeString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <SortableTable
+                data={whitelistBlocks.data || []}
+                isLoading={blocksLoading}
+                sortConfig={blocksSortConfig}
+                onSort={(key: string, direction: "asc" | "desc" | null) => {
+                  if (direction === null) {
+                    setBlocksSortConfig(null);
+                  } else {
+                    setBlocksSortConfig({ key, direction });
+                  }
+                }}
+                columns={[
+                  {
+                    key: "value",
+                    label: "Blocked Value",
+                    sortable: true,
+                    render: (value: string, block: WhitelistBlock) => (
+                      <div className="flex items-center space-x-2 font-mono text-sm group">
+                        <span>{value}</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleCopy(value)}
+                          className="p-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )
+                  },
+                  {
+                    key: "type",
+                    label: "Type",
+                    sortable: true,
+                    render: (type: string) => (
+                      <Badge className={getTypeColor(type)}>
+                        {type.toUpperCase()}
+                      </Badge>
+                    )
+                  },
+                  {
+                    key: "source",
+                    label: "Source",
+                    sortable: true,
+                    render: (source: string, block: WhitelistBlock) => (
+                      <Badge variant="outline">
+                        {block.sourceName || (source === 'manual' ? (block.createdByUsername || 'Manual Entry') : source)}
+                      </Badge>
+                    )
+                  },
+                  {
+                    key: "whitelistValue",
+                    label: "Blocked By",
+                    sortable: true,
+                    render: (whitelistValue: string | null) => (
+                      <span className="font-mono text-sm">
+                        {whitelistValue || 'Unknown'}
+                      </span>
+                    )
+                  },
+                  {
+                    key: "attemptedAt",
+                    label: "Attempted",
+                    sortable: true,
+                    render: (attemptedAt: string) => (
+                      <span className="text-sm text-gray-500">
+                        {new Date(attemptedAt).toLocaleDateString()} {new Date(attemptedAt).toLocaleTimeString()}
+                      </span>
+                    )
+                  }
+                ]}
+              />
             )}
             {/* Blocks Pagination */}
             {whitelistBlocks?.pagination && (
