@@ -27,11 +27,16 @@ export default function AuditLogs() {
   const [filters, setFilters] = useState({
     level: "all",
     action: "all",
+    resource: "all",
     user: "",
+    search: "",
+    ipAddress: "",
     startDate: "",
     endDate: "",
   });
   const [userInput, setUserInput] = useState(""); // Local state for user input
+  const [searchInput, setSearchInput] = useState(""); // Local state for search input
+  const [ipInput, setIpInput] = useState(""); // Local state for IP address input
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(50);
   const { user } = useAuth();
@@ -46,6 +51,26 @@ export default function AuditLogs() {
 
     return () => clearTimeout(timer);
   }, [userInput]);
+
+  // Debounce the search filter with 500ms delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: searchInput }));
+      setPage(1); // Reset to first page when filtering
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  // Debounce the IP address filter with 500ms delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => ({ ...prev, ipAddress: ipInput }));
+      setPage(1); // Reset to first page when filtering
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [ipInput]);
 
   const { data: logs, isLoading } = useQuery({
     queryKey: ["/api/audit-logs", page, pageSize, filters],
@@ -168,62 +193,184 @@ export default function AuditLogs() {
 
         {/* Log Filters */}
         <Card className="mt-6">
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div>
-                <Select value={filters.level} onValueChange={(value) => setFilters({ ...filters, level: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Levels" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Levels</SelectItem>
-                    <SelectItem value="info">Info</SelectItem>
-                    <SelectItem value="warning">Warning</SelectItem>
-                    <SelectItem value="error">Error</SelectItem>
-                  </SelectContent>
-                </Select>
+          <CardContent className="p-4 space-y-4">
+            {/* Primary Search */}
+            <div>
+              <Input
+                placeholder="Search across all log details, resources, and content..."
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="text-sm"
+              />
+            </div>
+            
+            {/* Filter Grid */}
+            <div className="space-y-4">
+              {/* First Row - Dropdowns */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Level</label>
+                  <Select value={filters.level} onValueChange={(value) => setFilters({ ...filters, level: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Levels" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Levels</SelectItem>
+                      <SelectItem value="info">Info</SelectItem>
+                      <SelectItem value="warning">Warning</SelectItem>
+                      <SelectItem value="error">Error</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Action</label>
+                  <Select value={filters.action} onValueChange={(value) => setFilters({ ...filters, action: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Actions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Actions</SelectItem>
+                      <SelectItem value="create">Create</SelectItem>
+                      <SelectItem value="update">Update</SelectItem>
+                      <SelectItem value="delete">Delete</SelectItem>
+                      <SelectItem value="login">Login</SelectItem>
+                      <SelectItem value="logout">Logout</SelectItem>
+                      <SelectItem value="fetch">Fetch</SelectItem>
+                      <SelectItem value="blocked">Blocked</SelectItem>
+                      <SelectItem value="temp_activate">Temp Activate</SelectItem>
+                      <SelectItem value="cleanup">Cleanup</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Resource</label>
+                  <Select value={filters.resource} onValueChange={(value) => setFilters({ ...filters, resource: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Resources" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Resources</SelectItem>
+                      <SelectItem value="indicator">Indicator</SelectItem>
+                      <SelectItem value="data_source">Data Source</SelectItem>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="whitelist">Whitelist</SelectItem>
+                      <SelectItem value="settings">Settings</SelectItem>
+                      <SelectItem value="audit_logs">Audit Logs</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Select value={filters.action} onValueChange={(value) => setFilters({ ...filters, action: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Actions" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Actions</SelectItem>
-                    <SelectItem value="create">Create</SelectItem>
-                    <SelectItem value="update">Update</SelectItem>
-                    <SelectItem value="delete">Delete</SelectItem>
-                    <SelectItem value="login">Login</SelectItem>
-                    <SelectItem value="logout">Logout</SelectItem>
-                    <SelectItem value="fetch">Fetch</SelectItem>
-                    <SelectItem value="blocked">Blocked</SelectItem>
-                  </SelectContent>
-                </Select>
+              
+              {/* Second Row - Text Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">User</label>
+                  <Input
+                    placeholder="Filter by username"
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">IP Address</label>
+                  <Input
+                    placeholder="Filter by IP address"
+                    value={ipInput}
+                    onChange={(e) => setIpInput(e.target.value)}
+                    className="text-sm"
+                  />
+                </div>
               </div>
-              <div>
-                <Input
-                  placeholder="User"
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                />
-              </div>
-              <div>
-                <Input
-                  type="date"
-                  placeholder="Start Date"
-                  value={filters.startDate}
-                  onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-                />
-              </div>
-              <div>
-                <Input
-                  type="date"
-                  placeholder="End Date"
-                  value={filters.endDate}
-                  onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-                />
+              
+              {/* Third Row - Date Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
+                  <Input
+                    type="date"
+                    value={filters.startDate}
+                    onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
+                  <Input
+                    type="date"
+                    value={filters.endDate}
+                    onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                    className="text-sm"
+                  />
+                </div>
               </div>
             </div>
+            
+            {/* Active Filters Display */}
+            {(filters.search || filters.user || filters.ipAddress || filters.startDate || filters.endDate || 
+              filters.level !== "all" || filters.action !== "all" || filters.resource !== "all") && (
+              <div className="flex flex-wrap gap-2 pt-2 border-t">
+                <span className="text-sm text-gray-600 font-medium">Active Filters:</span>
+                {filters.search && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                    Search: "{filters.search}"
+                  </span>
+                )}
+                {filters.level !== "all" && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                    Level: {filters.level}
+                  </span>
+                )}
+                {filters.action !== "all" && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                    Action: {filters.action}
+                  </span>
+                )}
+                {filters.resource !== "all" && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                    Resource: {filters.resource}
+                  </span>
+                )}
+                {filters.user && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                    User: {filters.user}
+                  </span>
+                )}
+                {filters.ipAddress && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                    IP: {filters.ipAddress}
+                  </span>
+                )}
+                {(filters.startDate || filters.endDate) && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
+                    Date: {filters.startDate || "∞"} - {filters.endDate || "∞"}
+                  </span>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setFilters({
+                      level: "all",
+                      action: "all",
+                      resource: "all",
+                      user: "",
+                      search: "",
+                      ipAddress: "",
+                      startDate: "",
+                      endDate: "",
+                    });
+                    setUserInput("");
+                    setSearchInput("");
+                    setIpInput("");
+                    setPage(1);
+                  }}
+                  className="text-xs h-6 px-2"
+                >
+                  Clear All
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 

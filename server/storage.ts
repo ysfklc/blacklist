@@ -1044,14 +1044,32 @@ export class DatabaseStorage implements IStorage {
     if (filters.action) {
       conditions.push(eq(auditLogs.action, filters.action));
     }
+    if (filters.resource) {
+      conditions.push(eq(auditLogs.resource, filters.resource));
+    }
     if (filters.user) {
-      conditions.push(eq(users.username, filters.user));
+      conditions.push(ilike(users.username, `%${filters.user}%`));
+    }
+    if (filters.ipAddress) {
+      conditions.push(ilike(auditLogs.ipAddress, `%${filters.ipAddress}%`));
+    }
+    if (filters.search) {
+      // Search across multiple fields: details, resource, action
+      const searchTerm = `%${filters.search}%`;
+      conditions.push(or(
+        ilike(auditLogs.details, searchTerm),
+        ilike(auditLogs.resource, searchTerm),
+        ilike(auditLogs.action, searchTerm),
+        ilike(auditLogs.resourceId, searchTerm)
+      ));
     }
     if (filters.startDate) {
       conditions.push(sql`${auditLogs.createdAt} >= ${new Date(filters.startDate)}`);
     }
     if (filters.endDate) {
-      conditions.push(sql`${auditLogs.createdAt} <= ${new Date(filters.endDate)}`);
+      const endDate = new Date(filters.endDate);
+      endDate.setHours(23, 59, 59, 999); // Include the entire end date
+      conditions.push(sql`${auditLogs.createdAt} <= ${endDate}`);
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

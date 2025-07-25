@@ -1614,14 +1614,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Audit logs routes
+// Audit logs routes
   app.get("/api/audit-logs", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
-      const { page = 1, limit = 50, level, action, user, startDate, endDate } = req.query;
+      const { page = 1, limit = 50, level, action, resource, user, search, ipAddress, startDate, endDate } = req.query;
       const filters = {
         level: level as string,
         action: action as string,
+        resource: resource as string,
         user: user as string,
+        search: search as string,
+        ipAddress: ipAddress as string,
         startDate: startDate as string,
         endDate: endDate as string,
       };
@@ -1638,11 +1641,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/audit-logs/export", authenticateToken, requireRole(["admin"]), async (req, res) => {
     try {
-      const { level, action, user, startDate, endDate } = req.query;
+      const { level, action, resource, user, search, ipAddress, startDate, endDate } = req.query;
       const filters = {
         level: level as string,
         action: action as string,
+        resource: resource as string,
         user: user as string,
+        search: search as string,
+        ipAddress: ipAddress as string,
         startDate: startDate as string,
         endDate: endDate as string,
       };
