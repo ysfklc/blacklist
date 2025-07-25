@@ -36,6 +36,7 @@ export default function Topbar() {
         break;
       case "/whitelist":
         await queryClient.invalidateQueries({ queryKey: ["/api/whitelist"] });
+        await queryClient.invalidateQueries({ queryKey: ["/api/whitelist/blocks"] });
         break;
       case "/public-links":
         await queryClient.invalidateQueries({ queryKey: ["/api/public-files/stats"] });

@@ -63,10 +63,12 @@ export default function Whitelist() {
 
   const { data: whitelistResponse, isLoading } = useQuery({
     queryKey: ["/api/whitelist", page, pageSize],
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
   const { data: whitelistBlocks, isLoading: blocksLoading } = useQuery({
     queryKey: ["/api/whitelist/blocks", blocksPage, blocksPageSize],
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
   const form = useForm<WhitelistFormData>({
@@ -82,6 +84,7 @@ export default function Whitelist() {
     mutationFn: (data: WhitelistFormData) => apiRequest("POST", "/api/whitelist", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whitelist"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whitelist/blocks"] });
       form.reset();
       toast({
         title: "Success",
@@ -101,6 +104,7 @@ export default function Whitelist() {
     mutationFn: (id: number) => apiRequest("DELETE", `/api/whitelist/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/whitelist"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/whitelist/blocks"] });
       toast({
         title: "Success",
         description: "Entry removed from whitelist successfully",
@@ -131,6 +135,7 @@ export default function Whitelist() {
   };
 
   const totalPages = pagination ? Math.ceil(pagination.total / pageSize) : 1;
+  
   const onSubmit = (data: WhitelistFormData) => {
     createMutation.mutate(data);
   };
@@ -416,7 +421,7 @@ export default function Whitelist() {
                   sortable: true,
                   render: (createdAt: string) => (
                     <span className="text-sm text-gray-500">
-                      {new Date(createdAt).toLocaleDateString()}
+                      {new Date(createdAt).toLocaleDateString()} {new Date(createdAt).toLocaleTimeString()}
                     </span>
                   )
                 }
